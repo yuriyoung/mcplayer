@@ -5,7 +5,7 @@
 QmlPlaylistModel::QmlPlaylistModel(QObject *parent)
     : QAbstractItemModel(parent)
 {
-
+    setPlaylist(new MediaPlaylist);
 }
 
 int QmlPlaylistModel::rowCount(const QModelIndex &parent) const
