@@ -308,8 +308,8 @@ void MediaPlayerPrivate::updatePlaybackState(MediaPlayer::PlaybackState state)
 {
     Q_Q(MediaPlayer);
     qDebug(lcMediaPlayer) << "state changed"
-                          << QVariant::fromValue(MediaPlayer::PlaybackState(playbackState)).toString()
-                          << "to"<< QVariant::fromValue(MediaPlayer::PlaybackState(state)).toString();
+                          << playbackState
+                          << "to"<< state;
 
     if (playlist && playlist->currentIndex() != -1
             && state != playbackState

@@ -111,7 +111,9 @@ void MediaPlaylistPrivate::syncControls(MediaPlaylistControl *oldControl, MediaP
  * @brief MediaPlaylist::MediaPlaylist
  * @param parent
  */
-MediaPlaylist::MediaPlaylist(QObject *parent) : QObject(parent)
+MediaPlaylist::MediaPlaylist(QObject *parent)
+    : QObject(parent)
+    , d_ptr(new MediaPlaylistPrivate())
 {
     d_ptr->q_ptr = this;
     d_ptr->defaultControl = new LocalMediaPlaylistControl(this);
@@ -121,7 +123,9 @@ MediaPlaylist::MediaPlaylist(QObject *parent) : QObject(parent)
 
 MediaPlaylist::~MediaPlaylist()
 {
-
+    Q_D(MediaPlaylist);
+    if(d->mediaObject)
+        d->mediaObject->unbind(this);
 }
 
 MediaObject *MediaPlaylist::mediaObject() const
