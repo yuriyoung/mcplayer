@@ -3,6 +3,7 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
 
 # Features
 - Local media playback control (play/pause/resume/stop/previous/next/shuffle)
+- Read local media metadata (Title/Artist/Album/Genre...)
 - Network media playback (TODO)
 - Support playlist control
   - Playlist playback mode:
