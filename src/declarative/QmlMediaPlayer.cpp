@@ -153,13 +153,32 @@ void QmlMediaPlayer::setSource(const QUrl &url)
 }
 
 MediaPlaylist *QmlMediaPlayer::playlist() const
-{
+{        
     return m_player->playlist();
 }
 
 void QmlMediaPlayer::setPlaylist(MediaPlaylist *playlist)
 {
-    m_player->setPlaylist(playlist);
+    m_media = playlist ? Media(playlist, QUrl(), false) : Media();
+    m_loaded = false;
+    if (m_componentCompleted && (m_autoLoad || m_media.isNull() || m_autoPlay))
+    {
+        if (m_error != MediaPlayer::EngineMissingError && m_error != MediaPlayer::NoError) {
+            m_error = MediaPlayer::NoError;
+            m_errorString = QString();
+            emit errorChanged();
+        }
+
+        if (!playlist)
+            m_playlistMediaChanged = true;
+        m_player->setMedia(m_media);
+        m_loaded = true;
+    }
+    else
+        emit playlistChanged();
+
+    if (m_autoPlay)
+        m_player->play();
 }
 
 QmlMediaPlayer::PlaybackState QmlMediaPlayer::playbackState() const
