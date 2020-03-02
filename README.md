@@ -15,6 +15,9 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
     - Heartbeat (TODO)
   - TODO: playlist save and load
 - Audio volume control
+- Audio visualization (TODO)
+- Audio output format (TODO)
+- Lyric (TODO)
 - Media library (TODO)
 - Support formats depend on libvlc
 
