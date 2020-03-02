@@ -39,10 +39,10 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
   
   > build and run
 
-  - Mac
+- Mac:
   > TODO
 
-  - Linux
+- Linux:
   > TODO
 
 > Copyright &copy; Yuri Young yuri.young@qq.ocm
