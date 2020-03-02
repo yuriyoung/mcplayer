@@ -35,9 +35,9 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
     	+--src
     	+--mcplayer.pro
     ```
-  > open the `mcplayer.pro` with Qt Creator
+  - open the `mcplayer.pro` with Qt Creator
   
-  > build and run
+  - build and run
 
 - Mac:
   > TODO
