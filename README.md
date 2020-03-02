@@ -45,4 +45,6 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
 - Linux:
   > TODO
 
+> :warning: NOTE: Read the code ( `QmlWindow.h` and `QmlWindow.cpp` ) and do something yourself before build. :grin::grin::grin:
+
 > Copyright &copy; Yuri Young yuri.young@qq.ocm
