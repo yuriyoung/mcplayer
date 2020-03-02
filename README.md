@@ -1,4 +1,4 @@
-# mcplayer
+# Introduce
 a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
 
 
