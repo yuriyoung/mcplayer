@@ -1,5 +1,37 @@
 <RCC>
-    <qresource prefix="/">
-        <file>ui/main.qml</file>
+	<qresource prefix="/">
+        <file>qtquickcontrols2.conf</file>
+    </qresource>
+    <qresource prefix="/assets">
+        <file alias="font/mdi.ttf">assets/font/materialdesignicons.ttf</file>
+        <file alias="img/background.jpg">assets/img/background.jpg</file>
+    </qresource>
+    <qresource prefix="/app">
+        <file alias="main.qml">ui/main.qml</file>
+        <file alias="BackgroundLayer.qml">ui/BackgroundLayer.qml</file>
+        <file alias="ControlLayer.qml">ui/ControlLayer.qml</file>
+    </qresource>
+    <qresource prefix="/styles">
+        <file alias="AppIcons.qml">ui/styles/AppIcons.qml</file>
+        <file alias="AppStyle.qml">ui/styles/AppStyle.qml</file>
+        <file alias="qmldir">ui/styles/qmldir</file>
+    </qresource>
+    <qresource prefix="/components">
+        <file alias="Button.qml">ui/components/Button.qml</file>
+        <file alias="Icon.qml">ui/components/Icon.qml</file>
+        <file alias="RoundButton.qml">ui/components/RoundButton.qml</file>
+        <file alias="RoundImage.qml">ui/components/RoundImage.qml</file>
+        <file alias="RoundMouseArea.qml">ui/components/RoundMouseArea.qml</file>
+        <file alias="qmldir">ui/components/qmldir</file>
+    </qresource>
+    <qresource prefix="/libraries">
+        <file alias="functions.js">ui/libraries/functions.js</file>
+        <file alias="mdi.js">ui/libraries/mdi.js</file>
+    </qresource>
+    <qresource prefix="/player">
+        <file alias="Playlist.qml">ui/player/Playlist.qml</file>
+        <file alias="PlayControl.qml">ui/player/PlayControl.qml</file>
+        <file alias="ProgressControl.qml">ui/player/ProgressControl.qml</file>
+        <file alias="VolumeControl.qml">ui/player/VolumeControl.qml</file>
     </qresource>
 </RCC>
