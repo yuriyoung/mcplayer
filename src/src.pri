@@ -1,4 +1,1 @@
-INCLUDEPATH += src
-
-SOURCES += \
-    $$PWD/main.cpp
+## include pri file ?
