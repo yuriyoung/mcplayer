@@ -1,5 +1,5 @@
 # mcplayer
-a music playback player buil on Qt 5 & Qt Quick & libvlc
+a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
 
 
 # ScreenShots
