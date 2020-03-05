@@ -22,15 +22,15 @@ Item {
         width: playbackProgress.width
         elide: Text.ElideRight
         text: {
-            var result = ""; // todo: show the media file name ?
+            var result = "Unknown Title"; // todo: show the media file name ?
             if(mediaMetaData) {
                 if(mediaMetaData.title)
-                    result += mediaMetaData.title
+                    result = mediaMetaData.title
                 if(mediaMetaData.author)
                     result += " - " + mediaMetaData.author
             }
 
-            return result ?? "Unknown Title";
+            return result;
         }
     }
 
