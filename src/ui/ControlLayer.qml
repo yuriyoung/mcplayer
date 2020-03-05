@@ -22,7 +22,7 @@ Item {
         width: playbackProgress.width
         elide: Text.ElideRight
         text: {
-            var result = "Unknown Title"; // todo: show the media file name ?
+            var result = ""; // todo: show the media file name ?
             if(mediaMetaData) {
                 if(mediaMetaData.title)
                     result += mediaMetaData.title
@@ -30,7 +30,7 @@ Item {
                     result += " - " + mediaMetaData.author
             }
 
-            return result;
+            return result ?? "Unknown Title";
         }
     }
 
