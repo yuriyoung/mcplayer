@@ -42,7 +42,9 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
   - unzip if you download zip package, install if you download the execute package.
   
   - copy `lib` and `include` folder to `3rdparty/vlc/`.
-  
+    - declare `typedef __int64 ssize_t;` in `vlc.h` file if you compile on x64.
+    - change `#include <vlc/xxx.h>` to `#include <xxx.h>`(remove `vlc/`) if could not find header files.
+    
   - copy dynamic link library (dll) files and `plugins` to `{project}/bin` path (the build path)
   
   	Folder tree like:
