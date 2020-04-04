@@ -1,7 +1,7 @@
 #include "Blueprint.h"
 #include "Grammar.h"
 #include "Database.h"
-#include "support/array_helper.h"
+#include "utils/array_helper.h"
 
 #include <QVariant>
 #include <QDebug>
