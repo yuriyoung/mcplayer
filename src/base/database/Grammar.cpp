@@ -1,6 +1,8 @@
 #include "Grammar.h"
 #include "Grammar_p.h"
 
+#include <QDate>
+#include <QDateTime>
 #include <QDebug>
 
 Grammar::Grammar(QObject *parent)
@@ -103,7 +105,7 @@ QString Grammar::columnize(const QString &columns) const
     }
     // remove no wrap columns (?)
     // list.erase(list.begin(), list.begin() + originSize);
-    return list.join(",");
+    return list.join(", ");
 }
 
 QString Grammar::columnize(const QStringList &columns) const
@@ -114,7 +116,7 @@ QString Grammar::columnize(const QStringList &columns) const
         list.append(this->wrap(col));
     }
 
-    return list.join(",");
+    return list.join(", ");
 }
 
 /**
@@ -122,14 +124,14 @@ QString Grammar::columnize(const QStringList &columns) const
  * @param values
  * @return
  */
-QString Grammar::parameterize(const QStringList &values) const
+QString Grammar::parameterize(const QVariantList &values) const
 {
     QStringList list;
-    foreach(auto val, values)
+    foreach(auto &val, values)
     {
         list.append(this->parameter(val));
     }
-    return list.join(",");
+    return list.join(", ");
 }
 
 /**
@@ -137,14 +139,9 @@ QString Grammar::parameterize(const QStringList &values) const
  * @param value
  * @return
  */
-QString Grammar::parameter(const QString &value) const
+QString Grammar::parameter(const QVariant &value) const
 {
-    Q_UNUSED(value)
-
-    // TODO: value is a SQL Expression
-    // ...
-
-    return "?";
+    return  value.isValid() ? fromValue(value) : "?";
 }
 
 QString Grammar::quoteString(const QStringList &values) const
@@ -155,12 +152,22 @@ QString Grammar::quoteString(const QStringList &values) const
         list.append(quoteString(val));
     }
 
-    return list.join(",");
+    return list.join(", ");
 }
 
 QString Grammar::quoteString(const QString &value) const
 {
     return QString("'%1'").arg(value);
+}
+
+QString Grammar::dateFormat() const
+{
+    return QLatin1String("yyyy-MM-dd");
+}
+
+QString Grammar::datetimeFormat() const
+{
+    return QLatin1String("yyyy-MM-dd HH:mm:ss");
 }
 
 void Grammar::setTablePrefix(const QString &prefix)
@@ -175,4 +182,61 @@ QString Grammar::tablePrefix() const
 {
     Q_D(const Grammar);
     return d->tablePrefix;
+}
+
+QString Grammar::fromValue(const QVariant &value) const
+{
+    const QLatin1String nullValue("NULL");
+    if(value.isNull() || !value.isValid())
+        return nullValue;
+
+    QString result;
+    switch (value.type())
+    {
+    case QVariant::Int:
+    case QVariant::UInt:
+        result = value.toString();
+        break;
+    case QVariant::Bool:
+        result = QString::number(value.toBool());
+        break;
+    case QVariant::Date:
+        result = value.toDate().isValid() ? value.toDate().toString(dateFormat()) : nullValue;
+        break;
+    case QVariant::Time:
+        result = value.toTime().isValid() ? value.toTime().toString("HH:mm:ss") : nullValue;
+        break;
+    case QVariant::DateTime:
+        result = value.toDateTime().isValid() ? value.toDateTime().toString(datetimeFormat()) : nullValue;
+        break;
+    case QVariant::Char:
+    case QVariant::String:
+    {
+        QString r = value.toString();
+
+        // TODO: trim white space from end ?
+
+        // escape the "'" character
+        result = r.replace(QLatin1Char('\''), QLatin1String("''"));
+        break;
+    }
+    case QVariant::StringList:
+        result = value.toStringList().join(" ");
+        break;
+    case QVariant::ByteArray:
+    {
+        QByteArray ba = value.toByteArray();
+        static const char hexChars[] = "0123456789abcdef";
+        for(int i = 0; i < ba.size(); ++i)
+        {
+            uchar c = static_cast<uchar>(ba[i]);
+            result += QLatin1Char(hexChars[c >> 4]);
+            result += QLatin1Char(hexChars[c & 0x0f]);
+        }
+        break;
+    }
+    default: result = value.toString(); break;
+    }
+
+    return result;
 }

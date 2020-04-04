@@ -6,7 +6,6 @@
 class GrammarPrivate;
 class Grammar : public QObject
 {
-    Q_OBJECT
     Q_DECLARE_PRIVATE(Grammar)
 public:
     Grammar(QObject *parent = nullptr);
@@ -40,21 +39,24 @@ public:
     QString columnize(const QStringList &columns) const;
 
     //  Create query parameter place-holders for an array.
-    QString parameterize(const QStringList &values) const;
+    QString parameterize(const QVariantList &values) const;
     // Get the appropriate query parameter place-holder for a value.
-    QString parameter(const QString &value) const; // return "?";
+    QString parameter(const QVariant &value) const; // return "?";
 
     // Quote the given string literal.
     QString quoteString(const QStringList &values) const;
     QString quoteString(const QString &value) const;
 
     // Get the format for database stored dates.
-    virtual QString dataFormat() const { return "Y-m-d H:i:s"; }
+    virtual QString dateFormat() const;
+    virtual QString datetimeFormat() const;
 
     // Set the grammar's table prefix.
     void setTablePrefix(const QString &prefix);
     // Get the grammar's table prefix.
     QString tablePrefix() const;
+
+    QString fromValue(const QVariant &value) const;
 
 protected:
     Grammar(GrammarPrivate &dd, QObject *parent = nullptr);
