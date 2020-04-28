@@ -3,7 +3,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/yuriyoung/mcplayer)](https://github.com/yuriyoung/mcplayer/issues)
 [![GitHub license](https://img.shields.io/github/license/yuriyoung/mcplayer?label=license)](https://github.com/yuriyoung/mcplayer/blob/master/LICENSE)
 
-# Introduce
+# Introduction
 a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
 
 # Features
