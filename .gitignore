@@ -1,0 +1,56 @@
+# Binaries
+*.exe
+*.app
+
+# OSX files
+*.DS_Store
+
+# C++ objects and libs
+*.slo
+*.lo
+*.o
+*.a
+*.la
+*.lai
+*.so
+*.dll
+*.dylib
+*.pdb
+
+# Qt files
+*.qmake.cache
+*.qmake.stash
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+moc_*.cpp
+qrc_*.cpp
+moc_*.h
+ui_*.h
+build*/
+/bin
+
+
+# QtCreator
+*.autosave
+*.qmlproject.user
+*.qmlproject.user.*
+CMakeLists.txt.user
+
+# CLion
+.idea
+
+# Git mergetool
+~.orig
+
+# CMake Files:
+src/*_automoc.cpp
+*CMakeCache.txt*
+
+# vscode
+**/.vscode
+
+# 4rdparty deps
+/3rdparty
