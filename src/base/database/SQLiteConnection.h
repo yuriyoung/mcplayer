@@ -10,8 +10,9 @@ class SQLiteConnection : public Connection
 public:
     explicit SQLiteConnection(const QString &prefix = "");
 
-    virtual Grammar *queryGrammar();
-    virtual Grammar *schemaGrammar();
+protected:
+    virtual Grammar *createScheamGrammar();
+    virtual Grammar *createQueryGrammar();
 };
 
 #endif // SQLITECONNECTION_H

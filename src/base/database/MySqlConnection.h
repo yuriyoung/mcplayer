@@ -8,8 +8,8 @@ class MySqlConnection : public Connection
 public:
     explicit MySqlConnection(const QString &prefix = "");
 
-    virtual Grammar *queryGrammar();
-    virtual Grammar *schemaGrammar();
+    virtual Grammar *createScheamGrammar();
+    virtual Grammar *createQueryGrammar();
 
     virtual bool reconnect();
 };

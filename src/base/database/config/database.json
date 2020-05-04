@@ -1,0 +1,81 @@
+{
+    "migrations": "migrations",
+    "default": "connection0",
+    "connections": {
+        "connection0": {
+            "driver": "qsqlite",
+            "url": "",
+            "database": "library.db",
+            "prefix": "mc_",
+            "username": "",
+            "password": "",
+            "foreign_key_constraints": true,
+            "options": ""
+        },
+        "connection1": {
+            "driver": "qsqlite",
+            "url": "",
+            "database": "settings.db",
+            "prefix": "mc_",
+            "username": "",
+            "password": "",
+            "foreign_key_constraints": true,
+            "options": ""
+        },
+        "connection2": {
+            "driver": "qsqlite",
+            "url": "",
+            "database": "test.db",
+            "prefix": "",
+            "username": "",
+            "password": "",
+            "foreign_key_constraints": true,
+            "options": ""
+        },
+
+        "mysql": {
+            "driver": "mysql",
+            "url": "",
+            "host": "127.0.0.1",
+            "port": "3306",
+            "database": "forge",
+            "username": "forge",
+            "password": "",
+            "unix_socket": "",
+            "charset": "utf8mb4",
+            "collation": "utf8mb4_unicode_ci",
+            "prefix": "",
+            "prefix_indexes": true,
+            "strict": true,
+            "options": ""
+        },
+
+        "sqlsrv": {
+            "driver": "sqlsrv",
+            "url": "",
+            "host": "127.0.0.1",
+            "port": "5432",
+            "database": "forge",
+            "username": "forge",
+            "password": "",
+            "charset": "utf8",
+            "prefix": "",
+            "prefix_indexes": true,
+            "schema": "public",
+            "sslmode": "prefer"
+        },
+
+        "pgsql": {
+            "driver": "pgsql",
+            "url": "",
+            "host": "localhost",
+            "port": "1433",
+            "database": "forge",
+            "username": "forge",
+            "password": "",
+            "charset": "utf8",
+            "prefix": "",
+            "prefix_indexes": true
+        }
+    }
+}

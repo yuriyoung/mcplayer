@@ -64,12 +64,11 @@ class Database : public QObject
     Q_DECLARE_PRIVATE(Database)
     QScopedPointer<DatabasePrivate> d_ptr;
 public:
-    explicit Database(QObject *parent = nullptr);
     ~Database();
 
     static Database *instance();
-    static QueryBuilder *table(const QString &table, const QString &as = "", const QString &connection = "");
-    static SchemaBuilder *schema(const QString &connection = "");
+    static QueryBuilder table(const QString &table, const QString &as = "", const QString &connection = "");
+    static SchemaBuilder schema(const QString &connection = "");
 
     // get a datanase connection by specified config name, not a connection name
     // make a connection if dose not exists
@@ -79,6 +78,9 @@ public:
 
     // add a configure for new connection
     void addConnection(const QJsonObject &config, const QString &name = "default");
+
+private:
+    explicit Database(QObject *parent = nullptr);
 };
 
 #endif // DATABASE_H

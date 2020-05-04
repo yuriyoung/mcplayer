@@ -3,9 +3,7 @@
 
 #include "ColumnDefinition.h"
 #include "Command.h"
-#include "SchemaGrammar.h"
 
-#include <functional>
 #include <QObject>
 #include <QVariant>
 #include <QHash>
@@ -31,32 +29,40 @@
  */
 
 class Grammar;
-class Database;
+class Connection ;
 class BlueprintPrivate;
 class Blueprint
 {
     Q_DECLARE_PRIVATE(Blueprint)
+    QScopedPointer<BlueprintPrivate> d_ptr;
 public:
+    enum DataRole
+    {
+        IsCreatingRole = 0,
+        IsTemporaryRole,
+        CreateColumnsRole,
+        ChangeColumnsRole,
+        CommandsRole,
+    };
+
     using Closure = std::function<void(Blueprint*)>;
 
     explicit Blueprint(const QString &table, Closure callback = nullptr);
     virtual ~Blueprint();
 
-    void build(Database *db, Grammar *grammar);
-    QStringList toSql(Database *db, Grammar *grammar);
+    bool isTemporary() const;
+    QList<Command> allCommands() const;
+    QList<Command> commands(Command::Type type) const;
+    Command command(Command::Type type) const;
+    QList<ColumnDefinition> creatingColumns() const;
+    QList<ColumnDefinition> columns(ColumnDefinition::AttributeKey key) const;
+
+    void build(const Connection *connection, const  Grammar *grammar);
+    QStringList toSql();
 
     QString table() const;
 
-    QList<Command> commands() const;
-    QList<Command> commands(int type) const;
-    Command command(int type) const;
-
-    QList<ColumnDefinition> columns() const;
-    QList<ColumnDefinition> columns(int key) const;
-    QList<ColumnDefinition> addedColumns() const;
-
     bool creating() const;
-    bool isTemporary() const;
 
     // Indicate that the table needs to be created.
     void create();
@@ -234,9 +240,6 @@ public:
 
     // Adds the `remember_token` column to the table.
     ColumnDefinition &rememberToken();
-
-protected:
-    QScopedPointer<BlueprintPrivate> d_ptr;
 };
 
 #endif // BLUEPRINT_H

@@ -15,13 +15,11 @@ QueryGrammarPrivate::QueryGrammarPrivate(Grammar *q)
 
 QStringList QueryGrammarPrivate::compileClauses(QueryBuilder *builder) const
 {
-    QMap<int, QString> segments; //NOTE: auto sort by clause type
-    QMap<int, QList<Clause *> > clauses = builder->clauses();
-    QMap<int, QList<Clause *> >::const_iterator it = clauses.constBegin();
-    while (it != clauses.constEnd())
+    QMap<int, QString> segments; //NOTE: auto ascending order by clause type
+    QList<int> keys = builder->clauses().keys();
+    foreach(int key, keys)
     {
-        segments[it.key()] = compileClauses(builder, Clause::ClauseType(it.key()));
-        ++it;
+        segments[key] = compileClauses(builder, Clause::ClauseType(key));
     }
 
     // Concatenate an array of segments, removing empties.
@@ -38,43 +36,34 @@ QStringList QueryGrammarPrivate::compileClauses(QueryBuilder *builder) const
 QString QueryGrammarPrivate::compileClauses(QueryBuilder *builder, Clause::ClauseType type) const
 {
     QStringList segments;
-    QList<Clause*> conditions = builder->clauses(type);
+    QList<Clause*> clauses = builder->clauses(type);
     QueryGrammar *grammar = const_cast<QueryGrammar*>(q_func());
-    foreach(auto cond, conditions)
+    for(int i = 0; i < clauses.size(); ++i)
     {
-        segments << cond->interept(grammar);
+        segments << clauses[i]->interpret(grammar, i == 0);
     }
 
-    segments.removeAll("");
-    QString result;
-    if(type == Clause::Where || type == Clause::Having)
-        result = removeLeadingBoolean(segments);
-    else
-        result = segments.join(" ");
-
-    switch (type)
-    {
-    case Clause::Where:     return "where " + result; // TODO: using 'on' while is join clause
-    case Clause::Having:    return "having " + result;
-    case Clause::Order:     return "order by " + result;
-    case Clause::Union:
+    QString result = segments.join(" ").trimmed();
+    if(Clause::Union == type)
     {
         if(!builder->clauses(Clause::UnionOrder).isEmpty())
             result += " " + this->compileClauses(builder, Clause::UnionOrder);
 
         // TODO: compile union limit and union offset ?
-
-        break;
-    }
-    default: break;
     }
 
     return result;
 }
 
-QString QueryGrammarPrivate::removeLeadingBoolean(const QStringList clauses) const
+/**
+ * @brief just remove first and / or string.
+ *  this function absoleted. for details see \fn *Clause::leading().
+ * @param clause
+ * @return
+ */
+QString QueryGrammarPrivate::removeLeadingBoolean(const QString clause) const
 {
-    QString text = clauses.join(" ").trimmed();
+    QString text = clause;
     QRegExp rx("and\\s+|or\\s+");
     rx.setMinimal(true);
     // remove the leading boolean
@@ -109,46 +98,64 @@ QueryGrammar::~QueryGrammar()
     qDebug() << "QueryGrammar::~QueryGrammar()";
 }
 
-QStringList QueryGrammar::compile(void *data)
+QStringList QueryGrammar::compile(void *data, int type)
 {
     qDebug() << "QueryGrammar::compile()";
 
-    QStringList statements;
-    QueryBuilder *builder = static_cast<QueryBuilder *>(data);
-    if(!builder)
+//    QSharedPointer<QueryBuilder> query(static_cast<QueryBuilder *>(data));
+    QueryBuilder *query = static_cast<QueryBuilder *>(data);
+    if(!query)
     {
-        qWarning() << "parameter data can not coverte to QueryBuilder";
-        return statements;
+        qWarning() << "Could not compile for null data, can not convert to QueryBuilder.";
+        return QStringList();
     }
 
-    switch (builder->statementType())
+    QStringList statements;
+    switch (type)
     {
     case QueryBuilder::SelectStatement:
-        statements << compileSelect(builder);
+        statements << this->compileSelect(query);
         break;
     case QueryBuilder::InsertStatement:
     {
-        BindingsHash bindings = builder->bindings();
-        statements << this->compileInsert(builder, bindings[QueryBuilder::InserBinding]);
+        QList<QVariantMap> bindings = query->bindings(QueryBuilder::InsertBinding);
+        statements << this->compileInsert(query, bindings);
         break;
     }
     case QueryBuilder::UpdateStatement:
     {
-        BindingsHash bindings = builder->bindings();
-        statements << this->compileUpdate(builder, bindings[QueryBuilder::UpdateBinding]);
+        QList<QVariantMap> bindings = query->bindings(QueryBuilder::UpdateBinding);
+        statements << this->compileUpdate(query, bindings);
         break;
     }
     case QueryBuilder::DeleteStatement:
-        statements << this->compileDelete(builder);
+        statements << this->compileDelete(query);
+        break;
+    case QueryBuilder::ExistsStatement:
+        statements << this->compileExists(query);
+        break;
+    case QueryBuilder::RandomStatement:
+        statements << this->compileRandom("");
+        break;
+    case QueryBuilder::TruncateStatement:
+        statements << this->compileSavepoint("");
+        break;
+    case QueryBuilder::RollBackStatement:
+        statements << this->compileRollBack("");
         break;
     }
+
+    qDebug() << statements.join("; ");
 
     return statements;
 }
 
-QString QueryGrammar::compileSelect(QueryBuilder *builder)
+QString QueryGrammar::compileSelect(QueryBuilder *builder) const
 {
-    Q_D(QueryGrammar);
+    Q_D(const QueryGrammar);
+
+    if(builder->clauses(Clause::Column).isEmpty())
+        builder->addClause(Clause::Column, new ColumnClause("*", builder));
 
     QStringList statements = d->compileClauses(builder);
 
@@ -161,7 +168,6 @@ QString QueryGrammar::compileSelect(QueryBuilder *builder)
     }
 
     // TODO: compile unions here ?
-
 
     return statements.join(" ");
 }
@@ -179,13 +185,13 @@ QString QueryGrammar::compileSelect(QueryBuilder *builder)
  */
 QString QueryGrammar::compileInsert(QueryBuilder *builder, const Records &values)
 {
-    const QString table = this->wrapTable(builder->from());
+    const QString table = this->wrapTable(builder->table());
 
     if(values.isEmpty())
         return QString("insert into %1 default values").arg(table);
 
     // 从二维数组中取第一个元素的key作为绑定的列
-    // 因为默认批量插入的是相同类型的对象，具有相同的列以及列顺序相同
+    // 因为默认批量插入的是相同类型的对象，具有相同的列以及列顺序
     const QString columns = this->columnize(values.first().keys());
 
     // We need to build a list of parameter place-holders of values that are bound
@@ -195,7 +201,7 @@ QString QueryGrammar::compileInsert(QueryBuilder *builder, const Records &values
     foreach(auto &val, values)
     {
         // wrap place-holders of a record values
-        records << "(" + this->parameterize(val.values()) + ")";
+        records << "(" + this->parameterize(val.values(), true) + ")";
     }
     const QString parameters = records.join(", ");
 
@@ -209,21 +215,24 @@ QString QueryGrammar::compileUpdate(QueryBuilder *builder, const Records &values
     if(values.isEmpty())
         return "";
 
-    const QString table = this->wrapTable(builder->from());
+    const QString table = this->wrapTable(builder->table());
+    builder->removeClause(Clause::Column);
+    builder->removeClause(Clause::From);
     QStringList wheres = d->compileClauses(builder);
-    // TODO: clause joins for a update statement
 
     QStringList columns;
-    QVariantMap val = values.first();
-    QVariantMap::const_iterator it = val.constBegin();
-    while (it != val.constEnd())
+    const QVariantMap record = values.first();
+    QVariantMap::const_iterator it = record.constBegin();
+    while (it != record.constEnd())
     {
-        columns << wrap(it.key()) + " = " + parameter(it.value());
+        columns << wrap(it.key()) + " = " + parameter(it.value(), true);
+        ++it;
     }
 
+    // TODO: join clause
     // update table {join} set columns wheres
-    return QString("update %1 %2 set %3 %4")
-            .arg(table).arg("")
+    return QString("update %1 set %3 %4")
+            .arg(table)
             .arg(columns.join(", "))
             .arg(wheres.join(" "));
 }
@@ -231,21 +240,22 @@ QString QueryGrammar::compileUpdate(QueryBuilder *builder, const Records &values
 QString QueryGrammar::compileDelete(QueryBuilder *builder)
 {
     Q_D(QueryGrammar);
-    const QString table = wrapTable(builder->from());
-    const QStringList wheres = d->compileClauses(builder);
-    // TODO: joins conditions
+    builder->removeClause(Clause::From);
+    const QString table = wrapTable(builder->table());
+    const QStringList clauses = d->compileClauses(builder);
+    // TODO: alias and joins alause
     // ...
 
-    return QString("delete from %1 %2").arg(table).arg(wheres.join(" "));
+    // delete {alias} from table {joins} where
+    return QString("delete from %1 %2").arg(table).arg(clauses.join(" "));
 }
 
 QString QueryGrammar::compileExists(QueryBuilder *builder)
 {
-    Q_D(QueryGrammar);
-    QStringList conditions = d->compileClauses(builder);
+    QString select = this->compileSelect(builder);
     QString exists = this->wrap("exists");
     return QString("select exists(%1) as %2")
-            .arg(conditions.join(" ")).arg(exists);
+            .arg(select).arg(exists);
 }
 
 QString QueryGrammar::compileRandom(const QString &seed)
@@ -285,7 +295,7 @@ QString QueryGrammar::clauseAggregate(AggregateClause *ac)  const
 }
 
 // TODO: do bindings in column clause?
-QString QueryGrammar::clauseColumns(ColumnClause *cc) const
+QString QueryGrammar::clauseColumn(ColumnClause *cc) const
 {
     // 如果查询执行的是一个聚合select，我们让聚合编译函数处理select子句的构建，
     // 因为它需要更多的语法，最好由该函数来处理，以保持一切整洁。
@@ -311,32 +321,36 @@ QString QueryGrammar::clauseFrom(FromClause *fc) const
 
 QString QueryGrammar::clauseWhere(WhereClause *where)
 {
-    // invok where*();
-    QString invokMethod = where->invokableMethod();
-//    invokMethod = invokMethod.startsWith("where", Qt::CaseSensitive) ? invokMethod : "where" + invokMethod;
-    QByteArray text = invokMethod.toLocal8Bit();
+    // invoke where*();
+    QString invokeMethod = where->whereMethod();
+    QByteArray text = invokeMethod.toLocal8Bit();
     const char *method = text.constData();
 
     QString retVal;
-    QMetaObject::invokeMethod(this,
+    QMetaObject::invokeMethod(
+        this,
         method,
         Qt::DirectConnection,
         Q_RETURN_ARG(QString, retVal),
         Q_ARG(WhereClause*, where)
     );
 
-    return where->boolean() + " " + retVal;
+    //TODO: is the join query where?(see clauseJoin(...))
+
+    return where->leading() ? "where " + retVal : where->boolean() + " " + retVal;
 }
 
 QString QueryGrammar::clauseHaving(HavingClause *having) const
 {
-    QString result;
     QString column = this->wrap(having->columns().first());
     QString parameter = this->parameter(having->value());
-    result = QString("%1 %2 %3 %4")
-            .arg(having->boolean())
-            .arg(column).arg(having->op()).arg(parameter);
-    return result;
+    QString leading = having->leading() ? "having" : having->boolean();
+
+    return QString("%1 %2 %3 %4")
+            .arg(leading)
+            .arg(column)
+            .arg(having->op())
+            .arg(parameter);
 }
 
 QString QueryGrammar::clauseHavingBetween(HavingClause *having) const
@@ -369,12 +383,13 @@ QString QueryGrammar::clauseGroup(GroupClause *group) const
 QString QueryGrammar::clauseJoin(JoinClause *join) const
 {
     Q_D(const QueryGrammar);
-    // TODO: many many things ==!!!
+
     const QString table = wrapTable(join->table());
 
     // TODO: nested joins
 
-    QStringList wheres = d->compileClauses(join->query());
+    QStringList wheres = d->compileClauses(join->subQuery().data());
+    wheres.replaceInStrings("where ", "on ");
 
     // inner join (table {}) {wheres}
     return QString("%1 join %2 %3")
@@ -388,7 +403,10 @@ QString QueryGrammar::clauseOrder(OrderClause *order) const
     if(order->columns().isEmpty())
         return QString();
 
-    return QString("%1 %2")
+    QString leading = order->leading() ? "order by " : "";
+
+    return QString("%1%2 %3")
+            .arg(leading)
             .arg(wrap(order->columns().first()))
             .arg(order->direction());
 }
@@ -401,12 +419,12 @@ QString QueryGrammar::clauseUnion(UnionClause *uc) const
 
 QString QueryGrammar::clauseLimit(LimitClause *limit) const
 {
-    return "limit " + QString::number(limit->limit());
+    return "limit " + QString::number(limit->value());
 }
 
 QString QueryGrammar::clauseOffset(OffsetClause *offset) const
 {
-    return "offset " + QString::number(offset->offset());
+    return "offset " + QString::number(offset->value());
 }
 
 QString QueryGrammar::where(WhereClause *where) const
@@ -419,7 +437,9 @@ QString QueryGrammar::whereIn(WhereClause *where) const
     QVariant values = where->value();
     if(values.isValid())
     {
-        QString result = values.canConvert(QVariant::List) ? parameterize(values.toList()) : parameter(values);
+        QString result = values.canConvert(QVariant::List)
+                ? parameterize(values.toList())
+                : parameter(values);
         return wrap(where->columns().first()) + " in (" + result + ")";
     }
 
@@ -431,7 +451,9 @@ QString QueryGrammar::whereNotIn(WhereClause *where) const
     QVariant values = where->value();
     if(values.isValid())
     {
-        QString result = values.canConvert(QVariant::List) ? parameterize(values.toList()) : parameter(values);
+        QString result = values.canConvert(QVariant::List)
+                ? parameterize(values.toList())
+                : parameter(values);
         return wrap(where->columns().first()) + " not in (" + result + ")";
     }
 
@@ -474,7 +496,7 @@ QString QueryGrammar::whereNotNull(WhereClause *where) const
 
 QString QueryGrammar::whereBetween(WhereClause *where) const
 {
-    QString between = where->betweenOrNot() ? "between" : "not between";
+    QString between = where->type() == WhereClause::Between ? "between" : "not between";
     QString min = parameter(where->value().toList().first());
     QString max = parameter(where->value().toList().last());
 
@@ -485,10 +507,9 @@ QString QueryGrammar::whereBetween(WhereClause *where) const
 
 QString QueryGrammar::whereNested(WhereClause *where) const
 {
-    Q_UNUSED(where)
-    // TODO:
-
-    return "";
+    Q_D(const QueryGrammar);
+    QString nested = d->compileClauses(where->subQuery().get(), Clause::Where);
+    return "(" + nested + ")";
 }
 
 QString QueryGrammar::whereColumn(WhereClause *where) const
@@ -528,14 +549,14 @@ QString QueryGrammar::whereYear(WhereClause *where) const
 
 QString QueryGrammar::whereExists(WhereClause *where) const
 {
-    Q_D(const QueryGrammar);
-    return "exists (" + d->compileClauses(where->query()).join(" ") + ")";
+    QString sql = this->compileSelect(where->subQuery().get());
+    return "exists (" + sql + ")";
 }
 
 QString QueryGrammar::whereNotExists(WhereClause *where) const
 {
-    Q_D(const QueryGrammar);
-    return "not exists (" + d->compileClauses(where->query()).join(" ") + ")";
+    QString sql = this->compileSelect(where->subQuery().get());
+    return "not exists (" + sql + ")";
 }
 
 QString QueryGrammar::whereRowValues(WhereClause *where) const
@@ -549,15 +570,14 @@ QString QueryGrammar::whereSub(WhereClause *where) const
 {
     Q_D(const QueryGrammar);
     QVariant values = where->value();
-    QString select = d->compileClauses(where->query()).join(" ");
+    QString select = d->compileClauses(where->subQuery().get()).join(" ");
     return wrap(where->columns().first()) + " " + where->op() + " ("+ select +")";
 }
 
 QString QueryGrammar::whereJsonBoolen(WhereClause *where) const
 {
     Q_UNUSED(where)
-    // TODO
-
+    // TODO: implemention in sub-class for some database engine
     qWarning() << "This database engine does not support JSON operations.";
     return "";
 }
@@ -565,8 +585,13 @@ QString QueryGrammar::whereJsonBoolen(WhereClause *where) const
 QString QueryGrammar::whereJsonContains(WhereClause *where) const
 {
     Q_UNUSED(where)
-    // TODO
+    // TODO: implemention in sub-class for some database engine
     qWarning() << "This database engine does not support JSON operations.";
     return "";
+}
+
+void QueryGrammar::removeClause(QueryBuilder *builder, Clause::ClauseType type)
+{
+    builder->removeClause(type);
 }
 

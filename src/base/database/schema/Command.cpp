@@ -1,15 +1,16 @@
 #include "Command.h"
-#include "Column.h"
 
 #include <QDebug>
 
 class CommandPrivate
 {
 public:
-    CommandPrivate(Command::Type command, const QStringList &columns, const QString &index);
+    CommandPrivate(Blueprint *blueprint, Command::Type command,
+                   const QStringList &columns, const QString &index);
     CommandPrivate(const CommandPrivate &other);
     bool operator==(const CommandPrivate& other) const;
 
+    Blueprint *blueprint = nullptr;
     QAtomicInt ref;
     Command::Type type = Command::UnknownType;
     QStringList columns;
@@ -18,8 +19,9 @@ public:
     QVariantHash attributes;
 };
 
-CommandPrivate::CommandPrivate(Command::Type command, const QStringList &columns, const QString &index)
-    : ref(1), type(command), columns(columns), index(index)
+CommandPrivate::CommandPrivate(Blueprint *blueprint, Command::Type command,
+                               const QStringList &columns, const QString &index)
+    : blueprint(blueprint), ref(1), type(command), columns(columns), index(index)
 {
 
 }
@@ -34,7 +36,8 @@ bool CommandPrivate::operator==(const CommandPrivate &other) const
 {
     return (type == other.type
             && index == other.index
-            && columns == other.columns);
+            && columns == other.columns
+            && blueprint == other.blueprint);
 }
 
 /**
@@ -43,8 +46,9 @@ bool CommandPrivate::operator==(const CommandPrivate &other) const
  * @param columns
  * @param index
  */
-Command::Command(Command::Type command, const QStringList &columns, const QString &index)
-    : d(new CommandPrivate(command, columns, index))
+Command::Command(Command::Type command, Blueprint *blueprint,
+                 const QStringList &columns, const QString &index)
+    : d(new CommandPrivate(blueprint, command, columns, index))
 {
 
 }
@@ -129,6 +133,11 @@ Command &Command::initiallyImmediate(bool value)
     qAtomicDetach(d);
     d->attributes["initiallyImmediate"] = value;
     return *this;
+}
+
+Blueprint *Command::blueprint() const
+{
+    return d->blueprint;
 }
 
 QVariantHash &Command::attributes() const

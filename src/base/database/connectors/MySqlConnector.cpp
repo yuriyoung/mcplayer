@@ -42,7 +42,7 @@ void MySqlConnector::setEncoding(QSqlDatabase *db)
     {
         QString charset = this->config().value("charset").toString();
         QString collate = this->config().value("collation").toString();
-        collate = collate.isEmpty() ? "" : QString("collate \"%1\"").arg(collate);
+        collate = collate.isEmpty() ? "" : QString(" collate \"%1\"").arg(collate);
 
         db->exec(QString("set names \"%1\"%2").arg(charset).arg(collate));
     }

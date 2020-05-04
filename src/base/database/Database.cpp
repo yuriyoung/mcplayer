@@ -2,11 +2,11 @@
 #include "ConnectionProvider.h"
 #include "Connection.h"
 
-#include <QSqlDatabase>
 #include <QJsonObject>
 #include <QDebug>
 
-Q_GLOBAL_STATIC(Database, g_instance)
+//Q_GLOBAL_STATIC(Database, g_instance)
+static Database *g_instance = nullptr;
 
 class DatabasePrivate
 {
@@ -45,6 +45,7 @@ Database::Database(QObject *parent)
     : QObject(parent), d_ptr(new DatabasePrivate)
 {
     Q_D(Database);
+    g_instance = this;
     d->provider = new ConnectionProvider(this);
     d->reconnector = [this](Connection *db) -> bool {
         return this->reconnect(db->connectionName()) != nullptr;
@@ -63,25 +64,25 @@ Database::~Database()
 
 Database *Database::instance()
 {
+    if(!g_instance)
+        g_instance = new Database();
+
     return g_instance;
 }
 
-QueryBuilder *Database::table(const QString &table, const QString &as, const QString &connection)
+QueryBuilder Database::table(const QString &table, const QString &as, const QString &connection)
 {
-    return g_instance->connection(connection)->table(table, as);
+    return Database::instance()->connection(connection)->queryBuilder().from(table, as);
 }
 
-SchemaBuilder *Database::schema(const QString &connection)
+SchemaBuilder Database::schema(const QString &connection)
 {
-    return g_instance->connection(connection)->schemaBuilder();
+    return  Database::instance()->connection(connection)->schemaBuilder();
 }
 
 Connection *Database::connection(const QString &connection)
 {
     Q_D(Database);
-
-    // TODO: parse connection name and connection type from config
-    // ...
 
     QString connName = connection.isEmpty() ? d->provider->defaultConnection() : connection;
     if(!d->connections.contains(connName))

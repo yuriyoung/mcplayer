@@ -1,30 +1,13 @@
 #ifndef CLAUSE_H
 #define CLAUSE_H
 
-#include "QueryBuilder.h"
-#include "QueryGrammar.h"
-
 #include <QObject>
 #include <QVariant>
-#include <QDebug>
 #include <QExplicitlySharedDataPointer>
 
-//QT_FORWARD_DECLARE_CLASS(ClausePrivate)
-
-// issue: compile failed forward declare while using QExplicitlySharedDataPointer (damn!!!)
-class ClausePrivate : public QSharedData
-{
-public:
-    ClausePrivate() { }
-    ClausePrivate(const QStringList &columns) : columns(columns) { }
-    ClausePrivate(const ClausePrivate &other) : QSharedData(other) { }
-    virtual ~ClausePrivate() {}
-
-public:
-    QStringList columns = {};
-    QVariantMap bindings;
-};
-
+class QueryBuilder;
+class QueryGrammar;
+QT_FORWARD_DECLARE_CLASS(ClausePrivate)
 class Clause
 {
     Q_DECLARE_PRIVATE(Clause)
@@ -45,22 +28,18 @@ public:
         Offset,
     };
 
-    Clause();
-    Clause(const QStringList &columns);
-
+    explicit Clause(QueryBuilder *parent = nullptr);
     virtual ~Clause();
 
-    virtual int type() const = 0;
-    virtual QString interept(QueryGrammar *grammar) { Q_UNUSED(grammar) return ""; }
-    virtual void setBindings(const QVariantMap &bindings);
-    virtual QVariantMap bindings() const;
+    virtual QString interpret(QueryGrammar *grammar, bool leading = false) = 0;
 
-    virtual void setColumns(const QString &columns);
-    virtual void setColumns(const QStringList &columns);
-    virtual QStringList columns() const;
+    void setColumns(const QString &columns);
+    void setColumns(const QStringList &columns);
+    QStringList columns() const;
+    QueryBuilder *query() const;
 
 protected:
-    Clause(ClausePrivate &dd);
+    Clause(ClausePrivate &dd, QueryBuilder *parent = nullptr);
     QExplicitlySharedDataPointer<ClausePrivate> d_ptr; // only one ref instance of
 };
 
@@ -70,13 +49,10 @@ class FromClause : public Clause
     Q_DECLARE_PRIVATE(FromClause)
 public:
     FromClause(const QString &table, const QString &as = {}, const QVariantMap &bindings = {});
-    FromClause(const FromClause &other);
 
-    QString interept(QueryGrammar *grammar) override;
-    int type() const override { return From; }
+    QString interpret(QueryGrammar *grammar, bool leading) override;
     QString table() const;
-    QString as() const;
-    QVariantMap bindings() const override;
+    QVariantMap bindings() const;
 };
 
 class AggregateClausePrivate;
@@ -84,12 +60,13 @@ class AggregateClause : public Clause
 {
     Q_DECLARE_PRIVATE(AggregateClause)
 public:
-    AggregateClause(QueryBuilder *query, const QString &function, const QString &columns = "*");
-    AggregateClause(QueryBuilder *query, const QString &function, const QStringList &columns = { "*" });
+    AggregateClause(QueryBuilder *parent, const QString &function,
+                    const QString &columns = "*");
+    AggregateClause(QueryBuilder *parent, const QString &function,
+                    const QStringList &columns = { "*" });
 
-    int type() const override { return Aggregate; }
+    QString interpret(QueryGrammar *grammar, bool leading) override;
     QString function() const;
-    QueryBuilder *query() const;
 };
 
 class ColumnClausePrivate;
@@ -97,44 +74,67 @@ class ColumnClause : public Clause
 {
     Q_DECLARE_PRIVATE(ColumnClause)
 public:
-    ColumnClause(QueryBuilder *query, const QString &columns);
-    ColumnClause(QueryBuilder *query, const QStringList &columns);
-    ColumnClause(const ColumnClause &other);
+    ColumnClause(const QString &columns, QueryBuilder *parent);
+    ColumnClause(const QStringList &columns, QueryBuilder *parent);
 
-    int type() const override { return Column; }
-    QString interept(QueryGrammar *grammar) override;
-    QueryBuilder *query() const;
+    // TODO: add select sub for column
+    ColumnClause(const QueryBuilder &subQuery, const QString &as, QueryBuilder *parent);
+
+    QString interpret(QueryGrammar *grammar, bool leading) override;
 };
 
+/**
+ * TODO: handle nested joins
+ */
 class JoinClausePrivate;
 class JoinClause : public Clause
 {
     Q_DECLARE_PRIVATE(JoinClause)
 public:
-    enum JoinType
+    enum Type
     {
-        Left,
         Inner,
+        Left,
         Right,
         Cross
     };
 
-    JoinClause(QueryBuilder *parent, const QString &type, const QString &table);
+    JoinClause(QueryBuilder *parent, JoinClause::Type type,
+               const QString &table, bool where = false);
 
-    int type() const override { return Join; }
-    QString interept(QueryGrammar *grammar) override;
+    JoinClause(QueryBuilder *parent, const QString &type,
+               const QString &table, bool where = false);
 
-    QString table() const;
-    QString joinType() const;
+    QString interpret(QueryGrammar *grammar, bool leading) override;
 
+
+    /*!
+     * \brief Add an "on" clause to the join.
+     * On clauses can be chained, e.g.
+     *
+     *  $join->on('contacts.user_id', '=', 'users.id')
+     *       ->on('contacts.info_id', '=', 'info.id')
+     *
+     * will produce the following SQL:
+     *
+     * on `contacts`.`user_id` = `users`.`id` and `contacts`.`info_id` = `info`.`id`
+     */
     QueryBuilder &on(const QString &first, const QString &op = "",
                const QString &second = "", const QString &boolean = "and");
+
+    QueryBuilder &on(std::function<void(const QueryBuilder &)> column,
+                     const QString &boolean = "and");
+
     QueryBuilder &orOn(const QString &first, const QString &op = "",
                  const QString &second = "");
+
     QueryBuilder &where(const QString &first, const QString &op = "",
                   const QString &second = "", const QString &boolean = "and");
 
-    QueryBuilder *query() const;
+    QSharedPointer<QueryBuilder> subQuery() const;
+    QString table() const;
+    QString joinType() const;
+    bool isWhere() const;
     QList<JoinClause *> joins() const;
 };
 
@@ -143,8 +143,61 @@ class WhereClause : public Clause
 {
     Q_DECLARE_PRIVATE(WhereClause)
 public:
+    enum Type
+    {
+        Base,
+        In,
+        NotIn,
+        InRaw,
+        NotInRaw,
+        Null,
+        NotNull,
+        Between,
+        NotBetween,
+        Nested,
+        Column,
+        Date,
+        Time,
+        Day,
+        Month,
+        Year,
+        Exists,
+        NotExists,
+        RowValues,
+        Sub,
+        JsonBoolean,
+        JsonContains,
+    };
 
-    WhereClause(QueryBuilder *query, const QString &boolean);
+    // sub query (nest where select), eg: where foo=(select * from ...)
+    WhereClause(WhereClause::Type type,
+                const QString &column,
+                const QString &op,
+                const QueryBuilder &subQuery,
+                const QString &boolean = "and");
+
+    // nested where
+    WhereClause(WhereClause::Type type,
+                const QSharedPointer<QueryBuilder> &subQuery,
+                const QString &boolean);
+    // nested where
+    WhereClause(WhereClause::Type type,
+                const QueryBuilder &subQuery,
+                const QString &boolean);
+
+    WhereClause(WhereClause::Type type,
+                const QString &column,
+                const QString &op,
+                const QVariant &value,
+                const QString &boolean);
+
+    WhereClause(WhereClause::Type type,
+                const QString &column,
+                const QVariant &value,
+                const QString &boolean);
+
+/*
+    WhereClause(QSharedPointer<QueryBuilder> query, const QString &boolean);
 
     WhereClause(const QString &column, const QVariant &value,
                 const QString &op, const QString &boolean);
@@ -158,20 +211,20 @@ public:
     // betweenOrNotBetween equal true return between, false returns not between
     WhereClause(const QString &column, const QVariant &value,
                 const QString &boolean, bool betweenOrNotBetween);
+*/
 
-    int type() const override { return Where; }
-    QString interept(QueryGrammar *grammar) override;
+    QString interpret(QueryGrammar *grammar, bool leading) override;
+    void setParentQuery(QueryBuilder *parent);
+    QString whereMethod() const;
 
-    void setInvokableMethod(const QString &method);
-    QString invokableMethod() const;
-
-    bool betweenOrNot() const;
+    int type() const;
+    bool leading() const;
     QVariant value() const;
     QString op() const ;
     QString boolean();
     QString first() const;
     QString second() const;
-    QueryBuilder *query() const; // TODO: add a sub-select
+    QSharedPointer<QueryBuilder> subQuery() const;
 };
 
 class HavingClausePrivate;
@@ -186,13 +239,13 @@ public:
     HavingClause(const QString &column, const QVariant &value,
                  const QString &boolean, bool betweenOrNotBetween);
 
-    int type() const override { return Having; }
-    QString interept(QueryGrammar *grammar) override;
+    QString interpret(QueryGrammar *grammar, bool leading) override;
 
     QVariant value() const;
     QString boolean() const;
     QString op() const;
     bool betweenOrNot() const;
+    bool leading() const;
 };
 
 class GroupClausePrivate;
@@ -203,8 +256,7 @@ public:
     GroupClause(const QString &columns);
     GroupClause(const QStringList &columns);
 
-    int type() const override { return GroupBy; }
-    QString interept(QueryGrammar *grammar) override;
+    QString interpret(QueryGrammar *grammar, bool leading) override;
 };
 
 class OrderClausePrivate;
@@ -215,9 +267,9 @@ public:
     OrderClause(const QString &columns, const QString &direction = "asc");
     OrderClause(const QStringList &columns, const QString &direction = "asc");
 
-    int type() const override { return Order; }
-    QString interept(QueryGrammar *grammar) override;
+    QString interpret(QueryGrammar *grammar, bool leading) override;
     QString direction() const;
+    bool leading() const;
 };
 
 class UnionClausePrivate;
@@ -227,10 +279,8 @@ class UnionClause : public Clause
 public:
     UnionClause(QueryBuilder *query, bool all = false);
 
-    int type() const override { return Union; }
-    QString interept(QueryGrammar *grammar) override;
+    QString interpret(QueryGrammar *grammar, bool leading) override;
 
-    QueryBuilder *query() const;
     bool all() const;
 };
 
@@ -241,9 +291,8 @@ class LimitClause : public Clause
 public:
     LimitClause(int limit);
 
-    int type() const override { return Limit; }
-    QString interept(QueryGrammar *grammar) override;
-    int limit() const;
+    QString interpret(QueryGrammar *grammar, bool leading) override;
+    int value() const;
 };
 
 class OffsetClausePrivate;
@@ -253,11 +302,8 @@ class OffsetClause : public Clause
 public:
     OffsetClause(int offset);
 
-    int type() const override { return Offset; }
-    QString interept(QueryGrammar *grammar) override;
-    int offset() const;
+    QString interpret(QueryGrammar *grammar, bool leading) override;
+    int value() const;
 };
-
-
 
 #endif // CLAUSE_H

@@ -51,9 +51,7 @@ namespace Schema {
         GeometryCollection,
         MultiPoint,
         MultiLineString,
-        MultiPolygon,
-
-        UserType = 0x0100
+        MultiPolygon
     };
 }
 
@@ -68,16 +66,18 @@ class SchemaGrammar : public Grammar
     Q_DECLARE_PRIVATE(SchemaGrammar)
 public:
     explicit SchemaGrammar(QObject *parent = nullptr);
-    ~SchemaGrammar();
+    ~SchemaGrammar() override;
 
-    virtual QStringList compile(void *data);
+    virtual QStringList compile(void *data, int type) override;
 
-    // wrap column definition(type, length...)
+    // wrap column definition (name varchar(191) not null default ...)
     QStringList wrapColumns(Blueprint *blueprint);
 
-    QString getType(const ColumnDefinition &column);
+    // get column data type eg: ingeter/char/datetime
+    QString columnType(const ColumnDefinition &column);
 
-    virtual QHash<int, QByteArray> typeNames() const;
+    // get all lookup names of types supported
+    QHash<int, QByteArray> typeNames() const;
 
 /**
  * slots: set to invokable or using Q_INVOKABLE
@@ -128,38 +128,37 @@ protected slots:
     virtual QString typeMultiLineString(const ColumnDefinition &column) const;
     virtual QString typeMultiPolygon(const ColumnDefinition &column) const;
 
-
 protected:
-    virtual QString compileTableExists(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileColumnListing(Blueprint *blueprint, const Command &command) = 0;
+    virtual QString compileTableExists(const Command &command) = 0;
+    virtual QString compileColumnListing(const Command &command) = 0;
 
-    virtual QString compileEnableForeignKeyConstraints(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileDisableForeignKeyConstraints(Blueprint *blueprint, const Command &command) = 0;
+    virtual QString compileEnableForeignKeyConstraints(const Command &command) = 0;
+    virtual QString compileDisableForeignKeyConstraints(const Command &command) = 0;
 
-    virtual QString compileCreate(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileAdd(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileChange(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileForeign(Blueprint *blueprint, const Command &command) = 0;
+    virtual QString compileCreate(const Command &command) = 0;
+    virtual QString compileAdd(const Command &command) = 0;
+    virtual QString compileChange(const Command &command) = 0;
+    virtual QString compileForeign(const Command &command) = 0;
 
-    virtual QString compileRename(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileRenameColumn(Blueprint *blueprint, const Command &command);
-    virtual QString compileRenameIndex(Blueprint *blueprint, const Command &command) = 0;
+    virtual QString compileRename(const Command &command) = 0;
+    virtual QString compileRenameColumn(const Command &command);
+    virtual QString compileRenameIndex(const Command &command) = 0;
 
-    virtual QString compilePrimary(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileUnique(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileIndex(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileSpatialIndex(Blueprint *blueprint, const Command &command) = 0;
+    virtual QString compilePrimary(const Command &command) = 0;
+    virtual QString compileUnique(const Command &command) = 0;
+    virtual QString compileIndex(const Command &command) = 0;
+    virtual QString compileSpatialIndex(const Command &command) = 0;
 
-    virtual QString compileDrop(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileDropIfExists(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileDropColumn(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileDropPrimary(Blueprint *blueprint, const Command &command);
-    virtual QString compileDropUnique(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileDropIndex(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileDropSpatialIndex(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileDropForeign(Blueprint *blueprint, const Command &command);
-    virtual QString compileDropAllTables(Blueprint *blueprint, const Command &command) = 0;
-    virtual QString compileDropAllViews(...) = 0;
+    virtual QString compileDrop(const Command &command) = 0;
+    virtual QString compileDropIfExists(const Command &command) = 0;
+    virtual QString compileDropColumn(const Command &command) = 0;
+    virtual QString compileDropPrimary(const Command &command);
+    virtual QString compileDropUnique(const Command &command) = 0;
+    virtual QString compileDropIndex(const Command &command) = 0;
+    virtual QString compileDropSpatialIndex(const Command &command) = 0;
+    virtual QString compileDropForeign(const Command &command);
+    virtual QString compileDropAllTables(const Command &command) = 0;
+    virtual QString compileDropAllViews(...);
     virtual QString compileRebuild();
 
     /**
@@ -177,7 +176,7 @@ protected:
      *  SqlServer:
      *  - 'Increment', 'Collate', 'Nullable', 'Default', 'Persisted'
      */
-    virtual QString applyModifiers(Blueprint *blueprint, const ColumnDefinition &column) const = 0;
+    virtual QString applyModifiers(const ColumnDefinition &column) const = 0;
     /*
     virtual QString modifyVirtualAs(Blueprint *blueprint, const ColumnDefinition &column) const;
     virtual QString modifyStoredAs(Blueprint *blueprint, const ColumnDefinition &column) const;

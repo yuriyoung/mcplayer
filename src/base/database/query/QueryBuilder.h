@@ -1,16 +1,13 @@
 #ifndef QUERYBUILDER_H
 #define QUERYBUILDER_H
 
-#include "Connection.h"
-
 #include <QObject>
 #include <QSqlQuery>
 #include <QVariant>
 
-typedef QVariantMap Record;
-typedef QHash<int, QList<Record>> BindingsHash;
-typedef QHash<QString, QString> AggregateHash;
+typedef QHash<int, QList<QVariantMap> > BindingsHash;
 
+class Connection;
 class Grammar;
 class Clause;
 class QueryBuilderPrivate;
@@ -20,17 +17,21 @@ class QueryBuilder
     QScopedPointer<QueryBuilderPrivate> d_ptr;
     friend class QueryGrammar;
 public:
-    enum StatementType
+    enum CompileStatement
     {
         SelectStatement,
         InsertStatement,
         UpdateStatement,
-        DeleteStatement
+        DeleteStatement,
+        ExistsStatement,
+        RandomStatement,
+        TruncateStatement,
+        RollBackStatement
     };
 
     enum BindingType
     {
-        InserBinding = 0,
+        InsertBinding = 0,
         UpdateBinding,
         DeleteBinding,
         SelectBinding,
@@ -41,38 +42,48 @@ public:
         HavingBinding,
         OrderBinding,
         UnionBinding,
-        UnionOrderBinding
+        UnionOrderBinding,
     };
 
-    QueryBuilder(Connection *connection);
-    QueryBuilder(Connection *connection, Grammar *grammar);
+    QueryBuilder();
+    QueryBuilder(const Connection *connection);
+    QueryBuilder(const QueryBuilder &other);
+    QueryBuilder(const QueryBuilder &&other);
+    QueryBuilder& operator=(const QueryBuilder &other);
     ~QueryBuilder();
 
-    int statementType() const;
-    Connection  *connection() const;
+    void setConnection(const Connection *connection);
+    Connection *connection() const;
     Grammar *grammar() const;
-    QMap<int, QList<Clause *> > clauses() const;
-    QList<Clause*> clauses(int type) const;
+
+    QString table() const;
     bool isDistincted() const;
     bool isAggregated() const;
 
-    QString toSql();
+    QMap<int, QList<Clause *> > clauses() const;
+    QList<Clause*> clauses(int type) const;
 
-    QueryBuilder &setBindings(int bindingType, const QList<Record> &bindings);
-    QueryBuilder &addBinding(int bindingType, const Record &value);
+    QueryBuilder &setBindings(int bindingType, const QList<QVariantMap> &bindings);
+    QueryBuilder &addBinding(int bindingType, const QVariantMap &value);
+    QList<QVariantMap> bindings(QueryBuilder::BindingType type) const;
+    BindingsHash bindings() const;
 
-    bool insert(const Record &value);
-    bool insert(const QList< Record > &values);
-    qint64 update(const Record &value);
+    QString toSql() const;
+    bool exists();
+    bool insert(const QVariantMap &value);
+    bool insert(const QList< QVariantMap> &values);
+    qint64 update(const QVariantMap &value);
+    bool updateOrInsert(const QVariantMap &attribute, const QVariantMap &value);
+    int destroy(const QVariant &id = QVariant());
 
     QueryBuilder &select(const QString &columns = "*");
     QueryBuilder &select(const QStringList &columns);
     QueryBuilder &selectRaw(const QString &expression, const QVariantMap &bindings = {});
 
-    QueryBuilder &selectSub(QueryBuilder *query, const QString &as = QString());
+    QueryBuilder &selectSub(const QueryBuilder &query, const QString &as);
     QueryBuilder &addSelect(const QString &column);
-    QueryBuilder &from(const QString &table);
-    QueryBuilder &fromSub(QueryBuilder *query, const QString &as = QString());
+    QueryBuilder &from(const QString &table, const QString &as = "");
+    QueryBuilder &fromSub(const QueryBuilder &query, const QString &as);
     QueryBuilder &distinct();
 
     void find(int id, const QString &columns = "*");
@@ -81,14 +92,28 @@ public:
     QSqlQuery get(const QString &columns = "*");
     QSqlQuery get(const QStringList &columns = {"*"});
 
-    bool exists();
-
     QueryBuilder &join(const QString &table, const QString &first, const QString &op = "",
                        const QString &second = "", const QString &type = "inner", bool where = false);
 
+    QueryBuilder &joinWhere(const QString &table, const QString &first, const QString &op = "",
+                       const QString &second = "", const QString &type = "inner");
+
+    QueryBuilder &joinSub(const QueryBuilder &query, const QString &as,
+                          const QString &first, const QString &op = "", const QString &second = "",
+                          const QString &type = "inner", bool where = false);
+
     // Add a basic where clause to the query.
-    QueryBuilder &where(const QString &column, const QString &op,
+    QueryBuilder &where(const QString &column, const QVariant &op,
                         const QVariant &value = QVariant(), const QString &boolean = "and");
+    QueryBuilder &where(const QVariantMap &attributes, const QString &boolean = "and");
+    // Add a nested where statement to the query.
+    QueryBuilder &where(std::function<void(const QueryBuilder &)> column,
+                        const QString &boolean = "and");
+    // nested where select statement
+    QueryBuilder &where(const QString &column, const QString &op,
+                        std::function<void(const QueryBuilder &)> value,
+                        const QString &boolean = "and");
+
     // Add an "or where" clause to the query.
     QueryBuilder &orWhere(const QString &column, const QString &op = "",
                           const QVariant &value = QVariant());
@@ -200,8 +225,8 @@ public:
     QueryBuilder &forPage(int page, int perPage = 15);
 
     // Add a union statement to the query.
-    QueryBuilder &UnionAt(QueryBuilder *query, bool all = false);
-    QueryBuilder &UnionAll(QueryBuilder *query);
+    QueryBuilder &unionAt(QueryBuilder *query, bool all = false);
+    QueryBuilder &unionAll(QueryBuilder *query);
 
     int aggregate(const QString &function, const QString &column = "*");
     int aggregate(const QString &function, const QStringList &columns = {"*"});
@@ -212,12 +237,9 @@ public:
     int avg(const QString &column);
     int average(const QString &column);
 
-//    QueryBuilder &whereNested(const QString boolean = "and");
-
 private:
     void removeClause(int type);
-    BindingsHash bindings() const;
-    QString from() const;
+    void addClause(int type, Clause *cluase);
 };
 
 #endif // QUERYBUILDER_H

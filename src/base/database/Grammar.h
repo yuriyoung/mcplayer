@@ -4,6 +4,7 @@
 #include <QObject>
 
 class GrammarPrivate;
+// derive QObject for invoke methods
 class Grammar : public QObject
 {
     Q_DECLARE_PRIVATE(Grammar)
@@ -14,7 +15,7 @@ public:
     // virtual QHash<int, QString> components() = 0;
 
     // Compile a select query into SQL.
-    virtual QStringList compile(void *data) = 0;
+    virtual QStringList compile(void *data, int type = 0) = 0;
 
     // Wrap an array of values.
     virtual QStringList wrapArray(const QStringList &values) const;
@@ -38,10 +39,12 @@ public:
     QString columnize(const QString &columns) const;
     QString columnize(const QStringList &columns) const;
 
-    //  Create query parameter place-holders for an array.
-    QString parameterize(const QVariantList &values) const;
+    // Create query parameter place-holders for an array.
+    QString parameterize(const QVariantList &values, bool prepared = false) const;
     // Get the appropriate query parameter place-holder for a value.
-    QString parameter(const QVariant &value) const; // return "?";
+    QString parameter(const QVariant &value, bool prepared = false) const;
+    // Prepares the appropriate query place-holder for columns
+    QString preparize(const QStringList &columns) const;
 
     // Quote the given string literal.
     QString quoteString(const QStringList &values) const;

@@ -1,7 +1,6 @@
 #include "SQLiteSchemaGrammar.h"
 #include "SchemaGrammar_p.h"
 #include "ColumnDefinition.h"
-#include "Blueprint.h"
 
 #include <QDebug>
 
@@ -9,28 +8,20 @@ class SQLiteSchemaGrammarPrivate : public SchemaGrammarPrivate
 {
     Q_DECLARE_PUBLIC(SQLiteSchemaGrammar)
 public:
-    SQLiteSchemaGrammarPrivate(Grammar *q) : SchemaGrammarPrivate(q)
-    {
-
-    }
+    SQLiteSchemaGrammarPrivate(Grammar *q) : SchemaGrammarPrivate(q) { }
 
     QString getForeignKeys(Blueprint *blueprint)
     {
-        QList<Command> foreigns = blueprint->commands(Command::Foreign);
-
+        QList<Command> commands = blueprint->commands(Command::Foreign);
         QStringList foreignsSql;
-        foreach (auto &foreign, foreigns)
+        foreach (auto &foreign, commands)
         {
             QString sql = generateForeignKey(foreign);
             if(foreign["onDelete"].toBool())
-            {
                 sql += " on delete " + foreign["onDelete"].toString();
-            }
 
             if(foreign["onUpdate"].toBool())
-            {
                 sql += " on update " + foreign["onUpdate"].toString();
-            }
 
             foreignsSql << sql;
         }
@@ -41,12 +32,15 @@ public:
     QString getPrimaryKey(Blueprint *blueprint)
     {
         Q_Q(SQLiteSchemaGrammar);
-        Command primary = blueprint->command(Command::Primary);
-        if(primary.isValid())
-        {
-            return QString(", primary key (%1)").arg(q->columnize(primary.columns()));
-        }
-        return "";
+        QList<Command> commands = blueprint->commands(Command::Primary);
+        if(commands.isEmpty())
+            return QString();
+
+        Command primary = commands.last();
+        if(!primary.isValid())
+            return QString();
+
+        return QString(", primary key (%1)").arg(q->columnize(primary.columns()));
     }
 
 private:
@@ -200,44 +194,38 @@ QString SQLiteSchemaGrammar::typeMacAddress(const ColumnDefinition &column) cons
     return "varchar";
 }
 
-QString SQLiteSchemaGrammar::compileTableExists(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileTableExists(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     return "select * from sqlite_master where type = 'table' and name = ?";
 }
 
-QString SQLiteSchemaGrammar::compileColumnListing(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileColumnListing(const Command &command)
 {
-    Q_UNUSED(blueprint)
-    Q_UNUSED(command)
-
-    QString table = blueprint->table().replace(".", "__");
+    QString table = command.blueprint()->table().replace(".", "__");
 
     return QString("pragma table_info(%1)").arg(wrapTable(table));
 }
 
-QString SQLiteSchemaGrammar::compileEnableForeignKeyConstraints(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileEnableForeignKeyConstraints(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     return "PRAGMA foreign_keys = ON;";
 }
 
-QString SQLiteSchemaGrammar::compileDisableForeignKeyConstraints(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDisableForeignKeyConstraints(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     return "PRAGMA foreign_keys = OFF;";
 }
 
-QString SQLiteSchemaGrammar::compileCreate(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileCreate(const Command &command)
 {
-    Q_UNUSED(command)
     Q_D(SQLiteSchemaGrammar);
 
     qDebug() << "SQLiteSchemaGrammar::compileCreate";
 
+    Blueprint *blueprint = command.blueprint();
     QString create = blueprint->isTemporary() ? "create temporary" : "create";
     QString table = wrapTable(blueprint->table());
     QString columns = wrapColumns(blueprint).join(",");
@@ -248,40 +236,36 @@ QString SQLiteSchemaGrammar::compileCreate(Blueprint *blueprint, const Command &
             .arg(create).arg(table).arg(columns).arg(foreignKeys).arg(primaryKey);
 }
 
-QString SQLiteSchemaGrammar::compileAdd(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileAdd(const Command &command)
 {
-    Q_UNUSED(blueprint)
-    Q_UNUSED(command)
-
     QStringList statements;
-    QStringList columns = wrapColumns(blueprint);
+    QStringList columns = wrapColumns(command.blueprint());
     foreach(auto &column, columns)
     {
         QString prifixCol = "add column " + column;
-        statements << QString("alter table %1 %2").arg(wrapTable(blueprint->table())).arg(prifixCol);
+        statements << QString("alter table %1 %2")
+                      .arg(wrapTable(command.blueprint()->table()))
+                      .arg(prifixCol);
     }
-    // TODO: SQLite no support add multiple columns.
+    // TODO: SQLite not support add multiple columns.
     return statements.join(";");
 }
 
-QString SQLiteSchemaGrammar::compileChange(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileChange(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     return "";
 }
 
-QString SQLiteSchemaGrammar::compileForeign(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileForeign(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     // handled on table creation...
     return "";
 }
 
-QString SQLiteSchemaGrammar::compileRename(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileRename(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     if(!command["to"].toBool())
     {
@@ -289,14 +273,13 @@ QString SQLiteSchemaGrammar::compileRename(Blueprint *blueprint, const Command &
         return "";
     }
 
-    QString from = wrapTable(blueprint->table());
+    QString from = wrapTable(command.blueprint()->table());
     QString to = command["to"].toString();
     return "alter table " + from + " rename to " + wrapTable(to);
 }
 
-QString SQLiteSchemaGrammar::compileRenameIndex(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileRenameIndex(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
 
     // TODO: compile rename index
@@ -304,56 +287,51 @@ QString SQLiteSchemaGrammar::compileRenameIndex(Blueprint *blueprint, const Comm
     return "";
 }
 
-QString SQLiteSchemaGrammar::compilePrimary(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compilePrimary(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     // handled on table creation...
     return "";
 }
 
-QString SQLiteSchemaGrammar::compileUnique(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileUnique(const Command &command)
 {
     return QString("create unique index %1 on %2 (%3)")
             .arg(wrap(command.indexName()))
-            .arg(wrapTable(blueprint->table()))
+            .arg(wrapTable(command.blueprint()->table()))
             .arg(columnize(command.columns()));
 }
 
-QString SQLiteSchemaGrammar::compileIndex(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileIndex(const Command &command)
 {
     return QString("create index %1 on %2 (%3)")
             .arg(wrap(command.indexName()))
-            .arg(wrapTable(blueprint->table()))
+            .arg(wrapTable(command.blueprint()->table()))
             .arg(columnize(command.columns()));
 }
 
-QString SQLiteSchemaGrammar::compileSpatialIndex(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileSpatialIndex(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     // TODO: throw a database runtime exception
     qCritical() << "The database driver in use does not support spatial indexes.";
     return "";
 }
 
-QString SQLiteSchemaGrammar::compileDrop(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDrop(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
-    return "drop table " + wrapTable(blueprint->table());
+    return "drop table " + wrapTable(command.blueprint()->table());
 }
 
-QString SQLiteSchemaGrammar::compileDropIfExists(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDropIfExists(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
-    return "drop table if exists " + wrapTable(blueprint->table());
+    return "drop table if exists " + wrapTable(command.blueprint()->table());
 }
 
-QString SQLiteSchemaGrammar::compileDropColumn(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDropColumn(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
 
     // TODO: compileDropColumn
@@ -361,48 +339,44 @@ QString SQLiteSchemaGrammar::compileDropColumn(Blueprint *blueprint, const Comma
     return "";
 }
 
-QString SQLiteSchemaGrammar::compileDropPrimary(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDropPrimary(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
-    // no support
+    // unsupport
     return "";
 }
 
-QString SQLiteSchemaGrammar::compileDropUnique(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDropUnique(const Command &command)
 {
-    Q_UNUSED(blueprint)
     QString index = wrap(command.indexName());
     return "drop index " + index;
 }
 
-QString SQLiteSchemaGrammar::compileDropIndex(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDropIndex(const Command &command)
 {
-    Q_UNUSED(blueprint)
     QString index = wrap(command.indexName());
     return "drop index " + index;
 }
 
-QString SQLiteSchemaGrammar::compileDropSpatialIndex(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDropSpatialIndex(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     // TODO: throw a database runtime exception.
     qCritical() << "The database driver in use does not support spatial indexes.";
     return "";
 }
 
-QString SQLiteSchemaGrammar::compileDropForeign(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDropForeign(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
-    // no support
+    // unsupport
+    // TODO: throw a exception
+    qCritical() << "SQLite doesn't support dropping foreign keys (you would need to re-create the table).";
     return "";
 }
 
-QString SQLiteSchemaGrammar::compileDropAllTables(Blueprint *blueprint, const Command &command)
+QString SQLiteSchemaGrammar::compileDropAllTables(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     return "delete from sqlite_master where type in ('table', 'index', 'trigger')";
 }
@@ -412,10 +386,8 @@ QString SQLiteSchemaGrammar::compileDropAllViews(...)
     return "delete from sqlite_master where type in ('view')";
 }
 
-QString SQLiteSchemaGrammar::applyModifiers(Blueprint *blueprint, const ColumnDefinition &column) const
+QString SQLiteSchemaGrammar::applyModifiers(const ColumnDefinition &column) const
 {
-    Q_UNUSED(blueprint)
-
     QStringList modifiers;
 
     // nullable modifier

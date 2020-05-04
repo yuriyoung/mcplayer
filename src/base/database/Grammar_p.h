@@ -8,8 +8,8 @@ class GrammarPrivate
 {
     Q_DECLARE_PUBLIC(Grammar)
 public:
-    GrammarPrivate(Grammar *q) : q_ptr(q) { }
-    virtual ~GrammarPrivate() {}
+    GrammarPrivate(Grammar *q);
+    virtual ~GrammarPrivate();
 
     Grammar *q_ptr = nullptr;
     QString tablePrefix = "";

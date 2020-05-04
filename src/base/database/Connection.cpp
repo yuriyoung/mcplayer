@@ -1,9 +1,9 @@
 #include "Connection.h"
 #include "Connection_p.h"
+#include "Grammar.h"
 #include "connectors/Connector.h"
 #include "query/QueryBuilder.h"
 #include "schema/SchemaBuilder.h"
-#include "schema/SchemaGrammar.h"
 
 #include <QUuid>
 #include <QSqlDatabase>
@@ -29,10 +29,9 @@ Connection::Connection(ConnectionPrivate &dd, const QString &prefix)
 }
 
 Connection::Connection(const Connection &other)
+    : d_ptr(new ConnectionPrivate(this))
 {
-    Q_D(Connection);
-    d->driver = other.driverName();
-    d->tablePrefix = other.tablePrefix();
+    *d_ptr.data() = *other.d_ptr.data();
 }
 
 Connection::~Connection()
@@ -42,11 +41,34 @@ Connection::~Connection()
     d->connector.reset(nullptr);
 }
 
-SchemaBuilder *Connection::schemaBuilder()
+QSharedPointer<Grammar> Connection::schemaGrammar()
 {
     Q_D(Connection);
-    d->schemaBuilder = QSharedPointer<SchemaBuilder>::create(this);
-    return d->schemaBuilder.data();
+    if(!d->schemaGrammar)
+        d->schemaGrammar.reset(this->createScheamGrammar(), &Grammar::deleteLater);
+
+    return d->schemaGrammar;
+}
+
+QSharedPointer<Grammar> Connection::queryGrammar()
+{
+    Q_D(Connection);
+    if(!d->queryGrammar)
+        d->queryGrammar.reset(this->createQueryGrammar(), &Grammar::deleteLater);
+
+    return d->queryGrammar;
+}
+
+SchemaBuilder Connection::schemaBuilder() const
+{
+    // TODO: support other database schema builder
+    // SQLiteSchemaBuilder/MySQLSchemaBuilder/...
+    return SchemaBuilder(this);
+}
+
+QueryBuilder Connection::queryBuilder() const
+{
+    return QueryBuilder(this);
 }
 
 void Connection::setReconnection(Connection::Closure callback)
@@ -86,7 +108,7 @@ void Connection::disconnect()
 QString Connection::driverName() const
 {
     Q_D(const Connection);
-    return d->driver;
+    return d->connector->driverName();
 }
 
 QString Connection::connectionName() const
@@ -115,21 +137,6 @@ Grammar *Connection::withTablePrefix(Grammar *grammar) const
     return grammar;
 }
 
-void Connection::query()
-{
-    // TODO: return a query builder(new one with query grammar)
-}
-
-QueryBuilder *Connection::table(const QString &table, const QString &as)
-{
-    Q_UNUSED(table)
-    Q_UNUSED(as)
-
-    // TODO: return a query build and set from table with as alias
-    QueryBuilder *query = new QueryBuilder(this);
-    return &query->from(table);
-}
-
 QString Connection::selectOne(const QString &query, const QStringList &bindings)
 {
     Q_UNUSED(query)
@@ -139,42 +146,107 @@ QString Connection::selectOne(const QString &query, const QStringList &bindings)
 
 QSqlQuery Connection::select(const QString &query, const QVariantMap &bindings)
 {
-    QSqlQuery qu;
-    qu.prepare(query);
-
-    QMapIterator<QString, QVariant> it(bindings);
-    while (it.hasNext())
+    Q_D(Connection);
+    QSqlQuery sqlQuery(d->pdo);
+    sqlQuery.prepare(query);
+    if(query.contains(QRegExp("=\\s+\\?")))
     {
-        it.next();
-        qu.bindValue(it.key(), it.value());
+        foreach (auto &val, bindings)
+            sqlQuery.addBindValue(val);
     }
 
-    qu.exec(query);
-    return qu;
+    if(!sqlQuery.exec())
+    {
+        qWarning() << sqlQuery.lastError().text();
+    }
+
+    return sqlQuery;
 }
 
-bool Connection::insert(const QString &query, const QStringList &bindings)
+bool Connection::insert(const QString &query, const QVariantMap &bindings)
 {
-    Q_UNUSED(query)
-    Q_UNUSED(bindings)
-    return this->statement(query, bindings);
+    Q_D(Connection);
+    QSqlQuery sqlQuery(d->pdo);
+    sqlQuery.prepare(query);
+    foreach (auto &val, bindings)
+        sqlQuery.addBindValue(val);
+
+    bool ok;
+    if(!(ok = sqlQuery.exec()))
+    {
+        qWarning() << sqlQuery.lastError().text();
+    }
+
+    return ok;
+    //    return this->statement(query, bindings);
 }
 
-int Connection::update(const QString &query, const QStringList &bindings)
+bool Connection::insert(const QString &query, const QList<QVariantMap> &bindings)
 {
-    Q_UNUSED(query)
-    Q_UNUSED(bindings)
-    return 0;
+    Q_D(Connection);
+
+    QSqlQuery sqlQuery(d->pdo);
+    sqlQuery.prepare(query);
+
+    // batch binding
+    foreach (auto &record, bindings)
+    {
+        foreach (auto &val, record)
+            sqlQuery.addBindValue(val);
+    }
+
+    bool ok;
+    if(!(ok = sqlQuery.exec()))
+    {
+        qWarning() << sqlQuery.lastError().text();
+    }
+
+    // sqlQuery.lastInsertId();
+
+    return ok;
 }
 
-int Connection::del(const QString &query, const QStringList &bindings)
+int Connection::update(const QString &query, const QVariantMap &bindings)
 {
-    Q_UNUSED(query)
-    Q_UNUSED(bindings)
-    return 0;
+    Q_D(Connection);
+    QSqlQuery sqlQuery(d->pdo);
+    sqlQuery.prepare(query);
+    if(query.contains(QRegExp("=\\s+\\?")))
+    {
+        foreach (auto &val, bindings)
+            sqlQuery.addBindValue(val);
+    }
+
+    if(!sqlQuery.exec())
+    {
+        qWarning() << sqlQuery.lastError().text();
+    }
+
+    return sqlQuery.numRowsAffected();
 }
 
-int Connection::statement(const QString &query, const QStringList &bindings)
+int Connection::del(const QString &query, const QVariantMap &bindings)
+{
+    Q_D(Connection);
+    Q_UNUSED(bindings)
+
+    QSqlQuery sqlQuery(d->pdo);
+    sqlQuery.prepare(query);
+    if(query.contains(QRegExp("=\\s+\\?")))
+    {
+        foreach (auto &val, bindings)
+            sqlQuery.addBindValue(val);
+    }
+
+    if(!sqlQuery.exec())
+    {
+        qWarning() << sqlQuery.lastError().text();
+    }
+
+    return sqlQuery.numRowsAffected();
+}
+
+int Connection::statement(const QString &query, const QVariantMap &bindings)
 {
     Q_D(Connection);
     Q_UNUSED(bindings)
@@ -190,7 +262,7 @@ int Connection::statement(const QString &query, const QStringList &bindings)
     return 0;
 }
 
-int Connection::affectingStatement(const QString &query, const QStringList &bindings)
+int Connection::affectingStatement(const QString &query, const QVariantMap &bindings)
 {
     Q_UNUSED(query)
     Q_UNUSED(bindings)

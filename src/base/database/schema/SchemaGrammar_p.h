@@ -12,6 +12,9 @@ public:
     SchemaGrammarPrivate(Grammar *q);
     static const QHash<int, QByteArray> &defaultTypeNames();
 
+    QString compileCommand(const Command &command);
+    QString columnType(const ColumnDefinition &column);
+
     QHash<int, QByteArray> typeNames;
 };
 

@@ -1,6 +1,5 @@
 #include "SchemaGrammar.h"
 #include "SchemaGrammar_p.h"
-#include "Blueprint.h"
 #include "ColumnDefinition.h"
 
 #include <QMetaMethod>
@@ -62,9 +61,36 @@ namespace  {
 Q_GLOBAL_STATIC(DefaultTypeNames, g_defaultTypeNames)
 
 SchemaGrammarPrivate::SchemaGrammarPrivate(Grammar *q)
-    : GrammarPrivate(q), typeNames(defaultTypeNames())
+    : GrammarPrivate(q)
+    , typeNames(defaultTypeNames())
 {
 
+}
+
+QString SchemaGrammarPrivate::compileCommand(const Command &command)
+{
+    Q_Q(SchemaGrammar);
+    if(!command.isValid())
+        return QString();
+
+    QString name = command.name().trimmed();
+    if(name.isEmpty())
+        return QString();
+
+    QString methodName = QString("compile") + name.replace(0, 1, name[0].toUpper());
+    QByteArray text = methodName.toLocal8Bit();
+    const char *method = text.constData();
+
+    QString retVal;
+    q->metaObject()->invokeMethod(
+        q,
+        method,
+        Qt::DirectConnection,
+        Q_RETURN_ARG(QString, retVal),
+        Q_ARG(Command, command)
+    );
+
+    return retVal;
 }
 
 const QHash<int, QByteArray> &SchemaGrammarPrivate::defaultTypeNames()
@@ -89,88 +115,60 @@ SchemaGrammar::SchemaGrammar(SchemaGrammarPrivate &dd, QObject *parent)
 
 SchemaGrammar::~SchemaGrammar()
 {
-
+    qDebug() << "SchemaGrammar::~SchemaGrammar()";
 }
 
-QStringList SchemaGrammar::compile(void *data)
+QStringList SchemaGrammar::compile(void *data, int type)
 {
-    qDebug() << "SchemaGrammar::compile()";
+    Q_D(SchemaGrammar);
+    Q_UNUSED(type)
 
-    QStringList statements;
-
-    Blueprint *blueprint = static_cast<Blueprint *>(data);
+    Blueprint *blueprint =  static_cast<Blueprint *>(data);
     if(!blueprint)
+        return QStringList();
+
+    QList<Command> commands = blueprint->allCommands();
+    QStringList statements;
+    foreach(auto &cmd, commands)
     {
-        qWarning() << "parameter data can not coverte to Blueprint";
-        return statements;
+        QString data = d->compileCommand(cmd);
+        if(!data.isEmpty())
+            statements << data;
     }
 
-    foreach(const Command &command, blueprint->commands())
-    {
-        if(!command.isValid())
-            continue;
-
-        switch (command.type())
-        {
-        case Command::Primary: statements << compilePrimary(blueprint, command) ;break;
-        case Command::Unique: statements << compileUnique(blueprint, command); break;
-        case Command::Index: statements << compileIndex(blueprint, command) ;break;
-        case Command::SpatialIndex: statements << compileSpatialIndex(blueprint, command) ;break;
-
-        case Command::Add: statements << compileAdd(blueprint, command); break;
-        case Command::Change: statements << compileChange(blueprint, command); break;
-        case Command::Create: statements << compileCreate(blueprint, command); break;
-        case Command::Foreign: statements << compileForeign(blueprint, command) ;break;
-
-        case Command::Rename: statements << compileRename(blueprint, command); break;
-        case Command::RenameIndex: statements << compileRenameIndex(blueprint, command); break;
-        case Command::RenameColumn: statements << compileRenameColumn(blueprint, command); break;
-
-        case Command::Drop: statements << compileDrop(blueprint, command); break;
-        case Command::DropIfExists: statements << compileDropIfExists(blueprint, command); break;
-        case Command::DropColumn: statements << compileDropColumn(blueprint, command); break;
-        case Command::DropPrimary: statements << compileDropPrimary(blueprint, command); break;
-        case Command::DropUnique: statements <<  compileDropUnique(blueprint, command); break;
-        case Command::DropIndex: statements <<  compileDropIndex(blueprint, command); break;
-        case Command::DropSpatialIndex: statements << compileDropSpatialIndex(blueprint, command); break;
-        case Command::DropForeign: statements << compileDropForeign(blueprint, command); break;
-        default: break;
-        }
-    }
-
-    // TODO: erase emtpy item ?
     return statements;
 }
 
 QStringList SchemaGrammar::wrapColumns(Blueprint *blueprint)
 {
-    QStringList columns;
-    foreach(auto &column, blueprint->addedColumns())
+    QStringList results;
+    QList<ColumnDefinition> columns = blueprint->creatingColumns();
+    foreach(auto &column, columns)
     {
         QString colName = column[ColumnDefinition::Name].toString();
-        QString sql = wrap(colName) + " " + getType(column);
+        QString sql = this->wrap(colName) + " " + this->columnType(column);
 
-        // add column modifier
-        sql += this->applyModifiers(blueprint, column);
+        // apply column modifier
+        sql += this->applyModifiers(column);
 
-        columns << sql;
+        results << sql;
     }
 
-    return columns;
+    return results;
 }
 
-QString SchemaGrammar::getType(const ColumnDefinition &column)
+QString SchemaGrammar::columnType(const ColumnDefinition &column)
 {
     Q_D(SchemaGrammar);
     Schema::Type t = Schema::Type(column.value(ColumnDefinition::Type).toInt());
     QString type = d->typeNames[t];
     QString typeMethod = "type" + type.replace(0, 1, type[0].toUpper());
     QByteArray text = typeMethod.toLocal8Bit();
-    const char *methed = text.constData();
+    const char *method = text.constData();
 
     QString retVal;
     QMetaObject::invokeMethod(this,
-        methed,
+        method,
         Qt::DirectConnection,
         Q_RETURN_ARG(QString, retVal),
         Q_ARG(ColumnDefinition, column)
@@ -416,26 +414,29 @@ QString SchemaGrammar::typeMultiPolygon(const ColumnDefinition &column) const
     return "multipolygon";
 }
 
-QString SchemaGrammar::compileRenameColumn(Blueprint *blueprint, const Command &command)
+QString SchemaGrammar::compileRenameColumn(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
+
     // TODO: create a RenameColumn class to rename
 
     return "";
 }
 
-QString SchemaGrammar::compileDropPrimary(Blueprint *blueprint, const Command &command)
+QString SchemaGrammar::compileDropPrimary(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
     return "";
 }
 
-QString SchemaGrammar::compileDropForeign(Blueprint *blueprint, const Command &command)
+QString SchemaGrammar::compileDropForeign(const Command &command)
 {
-    Q_UNUSED(blueprint)
     Q_UNUSED(command)
+    return "";
+}
+
+QString SchemaGrammar::compileDropAllViews(...)
+{
     return "";
 }
 

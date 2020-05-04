@@ -6,16 +6,15 @@ MySqlConnection::MySqlConnection(const QString &prefix)
 
 }
 
-Grammar *MySqlConnection::queryGrammar()
+Grammar *MySqlConnection::createScheamGrammar()
 {
     // TODO: create SqliteQueryGrammar
 
     return nullptr;
 }
 
-Grammar *MySqlConnection::schemaGrammar()
+Grammar *MySqlConnection::createQueryGrammar()
 {
-    // do not create here
     // TODO: create a schema builder somewhere
 
     return nullptr;

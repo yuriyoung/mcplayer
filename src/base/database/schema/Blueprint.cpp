@@ -1,7 +1,7 @@
 #include "Blueprint.h"
-#include "Grammar.h"
-#include "Database.h"
-#include "utils/array_helper.h"
+#include "SchemaGrammar.h"
+#include "Connection.h"
+#include "support/array_helper.h"
 
 #include <QVariant>
 #include <QDebug>
@@ -12,13 +12,11 @@ class BlueprintPrivate
 {
     Q_DECLARE_PUBLIC(Blueprint)
 public:
-    BlueprintPrivate(Blueprint *q) : q_ptr(q)
-    {
-    }
+    BlueprintPrivate(Blueprint *q) : q_ptr(q) { }
 
     Command &addCommand(Command::Type type, const QVariantHash &parameters = {}, const QStringList &columns = {})
     {
-        Command command(type, columns);
+        Command command(type, q_ptr, columns);
         for(auto it = parameters.begin(); it != parameters.end(); ++it)
         {
             // allow repalced common key with value
@@ -46,7 +44,7 @@ public:
         if(indexName.isEmpty())
             indexName = createIndexName(type, columns);
 
-        Command command(type, columns, indexName);
+        Command command(type, q_ptr, columns, indexName);
         this->commands.append(command);
 
         return commands[commands.size() - 1];
@@ -214,9 +212,9 @@ public:
         });
     }
 
-    void ensureCommandsValid(Database *db)
+    void ensureCommandsValid(Connection  *connection )
     {
-        if(db->driverName() == "QSQLITE")
+        if(QString("QSQLITE").compare(connection ->driverName().toUpper()) == 0)
         {
             QList<int> list = {Command::DropColumn, Command::RenameColumn};
             QList<Command> results;
@@ -240,17 +238,56 @@ public:
         }
     }
 
+    QList<Command> commandsOfType(int type) const
+    {
+        QList<Command> commands;
+        foreach(auto cmd, commands)
+        {
+            if(cmd.type() == type)
+                commands << cmd;
+        }
+
+        return commands;
+    }
+
+    Command commandOfType(int type) const
+    {
+        foreach(auto cmd, commands)
+        {
+            if(cmd.type() == type)
+                return cmd;
+        }
+
+        return Command(Command::UnknownType);
+    }
+
+    QList<ColumnDefinition> columnsOfType(int type) const
+    {
+        return Arr::array_filter<ColumnDefinition>(columns, [type](const ColumnDefinition &val)
+        {
+            return val[type].toBool();
+        });
+    }
+
+    QList<ColumnDefinition> creatingColumns() const
+    {
+        return Arr::array_filter<ColumnDefinition>(columns, [](const ColumnDefinition &val)
+        {
+            return !val[ColumnDefinition::Change].toBool();
+        });
+    }
+
 
 public:
     Blueprint *q_ptr = nullptr;
+    Connection *connection = nullptr;
+    Grammar *grammar = nullptr;
     QString table;
+    bool temporary = false;
 
-    // [ {"key" => variant, "key2" => variant}, {"key" => variant, "key2" => variant}, ...]
     QList<Command> commands;
     QList<ColumnDefinition> columns;
-    bool temporary = false;
 };
-
 
 /**
  * @brief Blueprint::Blueprint
@@ -272,92 +309,66 @@ Blueprint::~Blueprint()
     qDebug() << "Blueprint::~Blueprint()";
 }
 
-void Blueprint::build(Database *db, Grammar *grammar)
+void Blueprint::build(const Connection *connection, const Grammar *grammar)
 {
     qDebug() << "Blueprint::build()\n";
-    foreach(auto sql, this->toSql(db, grammar))
+    Q_D(Blueprint);
+    d->connection = const_cast<Connection *>(connection);
+    d->grammar = const_cast<Grammar *>(grammar);
+    foreach(auto sql, this->toSql())
     {
-//        if(sql.isEmpty())
-//            continue;
+        if(sql.isEmpty())
+            continue;
 
-//        db->statement(sql);
-        qDebug() << sql;
+        d->connection->statement(sql);
     }
-
-    qDebug() << "\n";
 }
 
-QStringList Blueprint::toSql(Database *db, Grammar *grammar)
+QList<Command> Blueprint::allCommands() const
+{
+    Q_D(const Blueprint);
+    return d->commands;
+}
+
+QList<Command> Blueprint::commands(Command::Type type) const
+{
+    Q_D(const Blueprint);
+    return d->commandsOfType(type);
+}
+
+Command Blueprint::command(Command::Type type) const
+{
+    Q_D(const Blueprint);
+    return d->commandOfType(type);
+}
+
+QList<ColumnDefinition> Blueprint::creatingColumns() const
+{
+    Q_D(const Blueprint);
+    return d->creatingColumns();
+}
+
+QList<ColumnDefinition> Blueprint::columns(ColumnDefinition::AttributeKey key) const
+{
+    Q_D(const Blueprint);
+    return d->columnsOfType(key);
+}
+
+QStringList Blueprint::toSql()
 {
     Q_D(Blueprint);
-    Q_UNUSED(db)
 
     d->addImpliedCommands();
-//    d->ensureCommandsValid(db);
+//    d->ensureCommandsValid(connection );
 
     // compiling sql
-    return grammar->compile(this);
+    return d->grammar->compile(this);
 }
 
 QString Blueprint::table() const
 {
     Q_D(const Blueprint);
     return d->table;
-}
-
-QList<Command> Blueprint::commands() const
-{
-    Q_D(const Blueprint);
-    return d->commands;
-}
-
-QList<Command> Blueprint::commands(int type) const
-{
-    Q_D(const Blueprint);
-    QList<Command> commands;
-    foreach(auto cmd, d->commands)
-    {
-        if(cmd.type() == type)
-            commands << cmd;
-    }
-
-    return commands;
-}
-
-Command Blueprint::command(int type) const
-{
-    Q_D(const Blueprint);
-    foreach(auto cmd, d->commands)
-    {
-        if(cmd.type() == type)
-            return cmd;
-    }
-
-    return Command(Command::UnknownType);
-}
-
-QList<ColumnDefinition> Blueprint::columns() const
-{
-    Q_D(const Blueprint);
-    return d->columns;
-}
-
-QList<ColumnDefinition> Blueprint::columns(int key) const
-{
-    Q_D(const Blueprint);
-    return Arr::array_filter<ColumnDefinition>(d->columns, [key](const ColumnDefinition &val)
-    {
-        return val[key].toBool();
-    });
-}
-
-QList<ColumnDefinition> Blueprint::addedColumns() const
-{
-    Q_D(const Blueprint);
-    return Arr::array_filter<ColumnDefinition>(d->columns, [](const ColumnDefinition &val)
-    {
-        return !val[ColumnDefinition::Change].toBool();
-    });
 }
 
 bool Blueprint::creating() const
@@ -381,6 +392,7 @@ void Blueprint::create()
 {
     Q_D(Blueprint);
     d->addCommand(Command::Create);
+
 }
 
 void Blueprint::temporary()

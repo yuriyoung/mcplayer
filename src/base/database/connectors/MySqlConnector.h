@@ -13,7 +13,7 @@ class MySqlConnector : public Connector
     Q_OBJECT
 public:
     explicit MySqlConnector(const QString &name, QObject *parent = nullptr);
-    explicit MySqlConnector(const QString &name, const QJsonObject &config, QObject *parent = nullptr);
+    MySqlConnector(const QString &name, const QJsonObject &config, QObject *parent = nullptr);
 
     virtual QSqlDatabase connect(const QJsonObject &config) override;
 

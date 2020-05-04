@@ -9,6 +9,7 @@
 class QSqlDatabase;
 class Grammar;
 class SchemaBuilder;
+class QueryBuilder;
 
 class ConnectionPrivate
 {
@@ -17,13 +18,14 @@ public:
     virtual ~ConnectionPrivate() {}
 
     Connection *q_ptr = nullptr;
-    QSharedPointer<SchemaBuilder> schemaBuilder = nullptr;
-    QSharedPointer<Grammar> grammar = nullptr;
+//    QSharedPointer<SchemaBuilder> schemaBuilder = nullptr;
+//    QSharedPointer<QueryBuilder> queryBuilder = nullptr;
+    QSharedPointer<Grammar> schemaGrammar = nullptr;
+    QSharedPointer<Grammar> queryGrammar = nullptr;
 
     QSqlDatabase pdo;
     Connection::Closure reconnection = nullptr;
     QSharedPointer<Connector> connector = nullptr;
-    QString driver;
     QString tablePrefix = ""; // The table prefix for the database table.
 };
 

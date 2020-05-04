@@ -5,6 +5,17 @@
 #include <QDateTime>
 #include <QDebug>
 
+GrammarPrivate::GrammarPrivate(Grammar *q)
+    : q_ptr(q)
+{
+
+}
+
+GrammarPrivate::~GrammarPrivate()
+{
+
+}
+
 Grammar::Grammar(QObject *parent)
     : Grammar(*new GrammarPrivate(this), parent)
 {
@@ -98,14 +109,7 @@ QString Grammar::wrapValue(const QString &value) const
 QString Grammar::columnize(const QString &columns) const
 {
     QStringList list = columns.trimmed().split(",", QString::SkipEmptyParts);
-    int originSize = list.count();
-    for (int i = 0; i < originSize; ++i)
-    {
-        list.append(this->wrap(list[i]));
-    }
-    // remove no wrap columns (?)
-    // list.erase(list.begin(), list.begin() + originSize);
-    return list.join(", ");
+    return this->columnize(list);
 }
 
 QString Grammar::columnize(const QStringList &columns) const
@@ -124,12 +128,12 @@ QString Grammar::columnize(const QStringList &columns) const
  * @param values
  * @return
  */
-QString Grammar::parameterize(const QVariantList &values) const
+QString Grammar::parameterize(const QVariantList &values, bool prepared) const
 {
     QStringList list;
     foreach(auto &val, values)
     {
-        list.append(this->parameter(val));
+        list.append(this->parameter(val, prepared));
     }
     return list.join(", ");
 }
@@ -139,9 +143,19 @@ QString Grammar::parameterize(const QVariantList &values) const
  * @param value
  * @return
  */
-QString Grammar::parameter(const QVariant &value) const
+QString Grammar::parameter(const QVariant &value, bool prepared) const
 {
-    return  value.isValid() ? fromValue(value) : "?";
+//    return value.isValid() ? fromValue(value) : "?";
+    return prepared ? "?" : fromValue(value);
+}
+
+QString Grammar::preparize(const QStringList &columns) const
+{
+    QStringList list;
+    foreach(auto &col, columns)
+        list << this->wrap(col) + " = ?";
+
+    return list.join(", ");
 }
 
 QString Grammar::quoteString(const QStringList &values) const
@@ -201,13 +215,19 @@ QString Grammar::fromValue(const QVariant &value) const
         result = QString::number(value.toBool());
         break;
     case QVariant::Date:
-        result = value.toDate().isValid() ? value.toDate().toString(dateFormat()) : nullValue;
+        result = value.toDate().isValid()
+                ? quoteString(value.toDate().toString(dateFormat()))
+                : nullValue;
         break;
     case QVariant::Time:
-        result = value.toTime().isValid() ? value.toTime().toString("HH:mm:ss") : nullValue;
+        result = value.toTime().isValid()
+                ? quoteString(value.toTime().toString("HH:mm:ss"))
+                : nullValue;
         break;
     case QVariant::DateTime:
-        result = value.toDateTime().isValid() ? value.toDateTime().toString(datetimeFormat()) : nullValue;
+        result = value.toDateTime().isValid()
+                ? quoteString(value.toDateTime().toString(datetimeFormat()))
+                : nullValue;
         break;
     case QVariant::Char:
     case QVariant::String:
@@ -217,25 +237,28 @@ QString Grammar::fromValue(const QVariant &value) const
         // TODO: trim white space from end ?
 
         // escape the "'" character
-        result = r.replace(QLatin1Char('\''), QLatin1String("''"));
+        r.replace(QLatin1Char('\''), QLatin1String("''"));
+        result = quoteString(r);
         break;
     }
     case QVariant::StringList:
-        result = value.toStringList().join(" ");
+        result = quoteString(value.toStringList().join(" "));
         break;
     case QVariant::ByteArray:
     {
         QByteArray ba = value.toByteArray();
+        QString res;
         static const char hexChars[] = "0123456789abcdef";
         for(int i = 0; i < ba.size(); ++i)
         {
             uchar c = static_cast<uchar>(ba[i]);
-            result += QLatin1Char(hexChars[c >> 4]);
-            result += QLatin1Char(hexChars[c & 0x0f]);
+            res += QLatin1Char(hexChars[c >> 4]);
+            res += QLatin1Char(hexChars[c & 0x0f]);
         }
+        result = quoteString(res);
         break;
     }
-    default: result = value.toString(); break;
+    default: result = quoteString(value.toString()); break;
     }
 
     return result;

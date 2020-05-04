@@ -16,7 +16,7 @@
  * - initiallyImmediate // set the default time to check the canstraint (PastgreSQL)
  *
  */
-
+class Blueprint;
 class CommandPrivate;
 class Command
 {
@@ -48,7 +48,9 @@ public:
         DropForeign,
     };
 
-    explicit Command(Command::Type command, const QStringList &columns = QStringList(), const QString &index = QString());
+    explicit Command(Command::Type command, Blueprint *blueprint = nullptr,
+                     const QStringList &columns = QStringList(),
+                     const QString &index = QString());
     Command(const Command &other);
     ~Command();
 
@@ -78,6 +80,7 @@ public:
     // Set the default time to check the constraint (PostgreSQL)
     Command &initiallyImmediate(bool value = true);
 
+    Blueprint *blueprint() const;
     QVariantHash &attributes() const;
     Command::Type type() const;
     QString name() const;

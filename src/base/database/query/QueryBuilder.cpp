@@ -1,6 +1,7 @@
 #include "QueryBuilder.h"
 #include "Grammar.h"
 #include "Clause.h"
+#include "Connection.h"
 
 #include <QMap>
 #include <QDate>
@@ -30,16 +31,20 @@ static bool invalidOperatorAndValue(const QString &op, const QVariant &value)
             && !ops.contains(lowerOp);
 }
 
+/**
+ * @brief The QueryBuilderPrivate class
+ */
 class QueryBuilderPrivate
 {
     Q_DECLARE_PUBLIC(QueryBuilder)
 public:
-    QueryBuilderPrivate(QueryBuilder *q) : q_ptr(q) {}
+    QueryBuilderPrivate(QueryBuilder *query) : q_ptr(query) { }
 
     void setAggregate(const QString &funciton, const QString &columns)
     {
+        Q_Q(QueryBuilder);
         isAggregated = true;
-        AggregateClause *agg = new AggregateClause(q_ptr, funciton, columns);
+        AggregateClause *agg = new AggregateClause(q, funciton, columns);
         clauses[Clause::Aggregate] = {agg};
 
         if(clauses[Clause::GroupBy].isEmpty())
@@ -55,55 +60,123 @@ public:
         clauses.remove(type);
     }
 
+    void setClause(Clause::ClauseType type, Clause *clause)
+    {
+        clauses[type] = {clause};
+    }
+
+    void setClause(Clause::ClauseType type, const QList<Clause*> &list)
+    {
+        clauses[type] = list;
+    }
+
+    void addClause(Clause::ClauseType type, Clause *clause)
+    {
+        clauses[type].append(clause);
+    }
+
+    bool hasClause(Clause::ClauseType type) const
+    {
+        return clauses.value(type).isEmpty();
+    }
+
     void removeBindings(QueryBuilder::BindingType type)
     {
         bindings.remove(type);
     }
 
+    QueryBuilder *whereNested(std::function<void(const QueryBuilder &)> callback,
+                              const QString &boolean = "and")
+    {
+        Q_Q(QueryBuilder);
+        QueryBuilder query(q->connection());
+        query.from(table);
+        callback(query);
+
+        if(!query.clauses(Clause::Where).isEmpty())
+        {
+            this->addClause(Clause::Where, new WhereClause(WhereClause::Nested, query, boolean));
+        }
+
+        return q;
+    }
+
+    // a full sub-select to the query.
+    QueryBuilder *whereSelect(const QString &column, const QString &op,
+                              std::function<void(const QueryBuilder &)> select,
+                              const QString &boolean = "and")
+    {
+        Q_Q(QueryBuilder);
+        QueryBuilder query(q->connection());
+        query.from(table);
+        select(query);
+
+        this->addClause(Clause::Where, new WhereClause(WhereClause::Sub, column, op, query, boolean));
+
+        return q_ptr;
+    }
+
     QueryBuilder *q_ptr = nullptr;
     Connection *connection = nullptr;
     Grammar *grammar = nullptr;
-    QueryBuilder::StatementType statementType;
-
-    QMap<int, QList<Clause*>> clauses;
-    QList<QueryBuilder *> subQueries; // joins
-    QHash<int, QList<Record> > bindings; // The current query value bindings.
-
-    QString from; // The table which the query is targeting.
+    QString table;
     bool isDistincted = false;
     bool isAggregated = false;
+
+    QMap<int, QList<Clause*> > clauses;
+    BindingsHash bindings;
 };
 
-QueryBuilder::QueryBuilder(Connection *connection)
+/**
+ * @brief QueryBuilder::QueryBuilder
+ * @param connection
+ */
+QueryBuilder::QueryBuilder()
     : d_ptr(new QueryBuilderPrivate(this))
 {
-    Q_D(QueryBuilder);
-    d->connection = connection;
-    d->grammar = connection->queryGrammar();
-    d->grammar->setTablePrefix(connection->tablePrefix());
+
 }
 
-QueryBuilder::QueryBuilder(Connection *connection, Grammar *grammar)
+QueryBuilder::QueryBuilder(const Connection *connection)
     : d_ptr(new QueryBuilderPrivate(this))
 {
     Q_D(QueryBuilder);
-    d->connection = connection;
-    d->grammar = grammar ? grammar : connection->queryGrammar();
+    d->connection = const_cast<Connection *>(connection);
+    d->grammar = d->connection->queryGrammar().get();
+}
+
+QueryBuilder::QueryBuilder(const QueryBuilder &other)
+    : d_ptr(new QueryBuilderPrivate(this))
+{
+    *d_ptr.data() = *other.d_ptr.data();
+}
+
+QueryBuilder::QueryBuilder(const QueryBuilder &&other)
+    : d_ptr(new QueryBuilderPrivate(this))
+{
+    *d_ptr.data() = *other.d_ptr.data();
+}
+
+QueryBuilder &QueryBuilder::operator=(const QueryBuilder &other)
+{
+    *d_ptr.data() = *other.d_ptr.data();
+    return *this;
 }
 
 QueryBuilder::~QueryBuilder()
 {
-    Q_D(const QueryBuilder);
+    qDebug() << "QueryBuilder::~QueryBuilder()";
+    Q_D(QueryBuilder);
     foreach (auto val, d->clauses) {
         qDeleteAll(val);
     }
-    qDebug() << "QueryBuilder::~QueryBuilder()";
+    d->clauses.clear();
 }
 
-int QueryBuilder::statementType() const
+void QueryBuilder::setConnection(const Connection *connection)
 {
-    Q_D(const QueryBuilder);
-    return d->statementType;
+    Q_D(QueryBuilder);
+    d->connection = const_cast<Connection *>(connection);
 }
 
 Connection *QueryBuilder::connection() const
@@ -136,16 +209,23 @@ void QueryBuilder::removeClause(int type)
     d->removeClause(Clause::ClauseType(type));
 }
 
-QString QueryBuilder::toSql()
-{
-    Q_D(const QueryBuilder);
-    return d->grammar->compile(this).join(" ");
-}
-
-QueryBuilder &QueryBuilder::setBindings(int bindingType, const QList<Record> &binding)
+void QueryBuilder::addClause(int type, Clause *cluase)
 {
     Q_D(QueryBuilder);
-    if(bindingType < InserBinding || bindingType > UnionBinding)
+    d->addClause(Clause::ClauseType(type), cluase);
+}
+
+
+QList<QVariantMap> QueryBuilder::bindings(QueryBuilder::BindingType type) const
+{
+    Q_D(const QueryBuilder);
+    return d->bindings.value(type);
+}
+
+QueryBuilder &QueryBuilder::setBindings(int bindingType, const QList<QVariantMap> &binding)
+{
+    Q_D(QueryBuilder);
+    if(bindingType < InsertBinding || bindingType > UnionBinding)
     {
         qWarning() << "Invalid binding type: " << bindingType;
         return *this;
@@ -156,81 +236,131 @@ QueryBuilder &QueryBuilder::setBindings(int bindingType, const QList<Record> &bi
     return *this;
 }
 
-/*!
- * \brief FROM => ["value1", "value2"]
- * \param value
- * \param type
- * \return
- */
-QueryBuilder &QueryBuilder::addBinding(int bindingType, const Record &value)
+QueryBuilder &QueryBuilder::addBinding(int bindingType, const QVariantMap &value)
 {
     Q_D(QueryBuilder);
-    d->bindings[bindingType].append(value);
+    if(bindingType < InsertBinding || bindingType > UnionBinding)
+    {
+        qWarning() << "Invalid binding type: " << bindingType;
+        return *this;
+    }
 
-//    QVariantMap::const_iterator it = value.constBegin();
-//    while (it != value.constEnd())
-//    {
-//        // If there is already an item with the key,
-//        // that item's value is replaced with value.
-//        d->bindings[bindingType].insert(it.key(), it.value());
-//        ++it;
-//    }
+    int total = d->bindings[bindingType].size();
+    if(total == 0)
+    {
+        d->bindings[bindingType].append(value);
+        return *this;
+    }
+
+    // only one item in list
+    QVariantMap::const_iterator it;
+    for(int i = 0; i < total; ++i)
+    {
+        for(it = value.constBegin(); it != value.constEnd(); ++it)
+        {
+            // If there is already an item with the key,
+            // that item's value is replaced with value.
+            d->bindings[bindingType][i].insert(it.key(), it.value());
+        }
+    }
 
     return *this;
 }
 
-bool QueryBuilder::insert(const Record &value)
+QString QueryBuilder::toSql() const
+{
+    Q_D(const QueryBuilder);
+    return d->grammar->compile(const_cast<QueryBuilder *>(this), SelectStatement).join(" ");
+}
+
+bool QueryBuilder::exists()
+{
+    Q_D(QueryBuilder);
+    QStringList statements = d->grammar->compile(this, ExistsStatement);
+    QString query = statements.join("; ");
+    QSqlQuery result = d->connection->select(query);
+
+    return result.next() && result.value(0).toBool();
+}
+
+bool QueryBuilder::insert(const QVariantMap &value)
 {
     Q_D(QueryBuilder);
 
-    d->statementType = InsertStatement;
-    this->setBindings(InserBinding, {value});
-    QStringList statements = d->grammar->compile(this);
+    this->setBindings(InsertBinding, {value});
+    QStringList statements = d->grammar->compile(this, InsertStatement);
     QString query = statements.join("; ");
-    qDebug() << query;
 
-    // TODO: connectin insert
-
-    return true;
+    return d->connection->insert(query, value);
 }
 
-bool QueryBuilder::insert(const QList<Record> &values)
+bool QueryBuilder::insert(const QList<QVariantMap> &values)
 {
     Q_D(QueryBuilder);
 
     if(values.isEmpty())
         return true;
 
-    d->statementType = InsertStatement;
-    this->setBindings(InserBinding, values);
-    QStringList statements = d->grammar->compile(this);
-    qDebug() << statements.join("; ");
+    this->setBindings(InsertBinding, values);
+    QStringList statements = d->grammar->compile(this, InsertStatement);
+    QString query = statements.join("; ");
 
-    // TODO: connection insert
-
-    return true;
+    return d->connection->insert(query, values);
 }
 
-qint64 QueryBuilder::update(const Record &value)
+qint64 QueryBuilder::update(const QVariantMap &value)
 {
     Q_D(QueryBuilder);
 
-    d->statementType = UpdateStatement;
-    // TODO: prepare bindings [except select and join clause?]
-    this->setBindings(UpdateBinding, {value});
-    QStringList statements = d->grammar->compile(this);
+    this->addBinding(UpdateBinding, value); // TODO: binding sub query also
+    QStringList statements = d->grammar->compile(this, UpdateStatement);
+    QString query = statements.join("; ");
 
-    // TODO: connection update
+    return d->connection->update(query, value);
+}
 
-    return 0;
+bool QueryBuilder::updateOrInsert(const QVariantMap &attribute, const QVariantMap &value)
+{
+    if(!this->where(attribute).exists())
+    {
+        QVariantMap merged = attribute;
+        QMapIterator<QString, QVariant> it(value);
+        while(it.hasNext())
+        {
+            it.next();
+            merged.insert(it.key(), it.value());
+        }
+        return this->insert(merged);
+    }
+
+    if(value.isEmpty())
+    {
+        qWarning() << "No value to update";
+        return true;
+    }
+
+    return this->limit(1).update(value);
+}
+
+int QueryBuilder::destroy(const QVariant &id)
+{
+    Q_D(QueryBuilder);
+    if(id.isValid())
+    {
+        this->where(d->table + ".id", "=", id);
+    }
+
+    QString sql = d->grammar->compile(this, DeleteStatement).join("; ");
+    QVariantMap binding =  this->bindings(DeleteBinding).isEmpty()
+            ? QVariantMap() : this->bindings(DeleteBinding).first();
+    return this->connection()->del(sql, binding);
 }
 
 QueryBuilder &QueryBuilder::select(const QString &columns)
 {
     Q_D(QueryBuilder);
-    d->statementType = SelectStatement;
-    ColumnClause *col = new ColumnClause(this, columns);
-    d->clauses[Clause::Column] = {col};
+    ColumnClause *col = new ColumnClause(columns, this);
+    d->setClause(Clause::Column, col);
 
     return *this;
 }
@@ -238,17 +368,22 @@ QueryBuilder &QueryBuilder::select(const QString &columns)
 QueryBuilder &QueryBuilder::select(const QStringList &columns)
 {
     Q_D(QueryBuilder);
-    d->statementType = SelectStatement;
-    // TODO: any column of columns is queryable
-    ColumnClause *col = new ColumnClause(this, columns);
-    d->clauses[Clause::Column] = {col};
+
+    // TODO: any column of columns is queryable (sub query)
+    // selectSub(query, as)
+
+    ColumnClause *col = new ColumnClause(columns, this);
+    d->setClause(Clause::Column, col);
 
     return *this;
 }
 
 QueryBuilder &QueryBuilder::selectRaw(const QString &expression, const QVariantMap &bindings)
 {
-    Q_D(QueryBuilder);
+    this->addSelect(expression);
+
+    if(!bindings.isEmpty())
+        this->addBinding(SelectBinding, bindings);
 
     return *this;
 }
@@ -259,7 +394,7 @@ QueryBuilder &QueryBuilder::selectRaw(const QString &expression, const QVariantM
  * \param as
  * \return
  */
-QueryBuilder &QueryBuilder::selectSub(QueryBuilder *query, const QString &as)
+QueryBuilder &QueryBuilder::selectSub(const QueryBuilder &query, const QString &as)
 {
     Q_D(QueryBuilder);
 
@@ -267,39 +402,43 @@ QueryBuilder &QueryBuilder::selectSub(QueryBuilder *query, const QString &as)
     // insert a sub select with as alias into columns
 
     // add sub select columns
-//    if(as.isEmpty())
-//    {
-//        d->columns << QString("%1").arg(query->toSql());
-//    }
-//    else
-//    {
-//        d->columns << QString("(%1) as %2").arg(query->toSql()).arg(d->grammar->wrap(as));
-//    }
+    if(as.isEmpty())
+    {
+        this->selectRaw(QString("%1").arg(query.toSql())/*, TODO: add select bindings */);
+    }
+    else
+    {
+        QString sql = QString("(%1) as %2").arg(query.toSql()).arg(d->grammar->wrap(as));
+        this->selectRaw(sql/*, TODO: add select bindings */);
+    }
 
-    // add bindings
-    auto bindgins = query->bindings();
-//    QStringList columnBindings = bindgins[SelectBinding];
-//    foreach (auto value, columnBindings)
-//    {
-//        this->addBinding(SelectBinding, value);
-//    }
+    // add select bindings
+    auto bindgins = query.bindings(SelectBinding);
+    foreach (auto value, bindgins)
+    {
+        this->addBinding(SelectBinding, value);
+    }
 
     return *this;
 }
 
+// TODO: addSelect(column, query builder)
 QueryBuilder &QueryBuilder::addSelect(const QString &column)
 {
     Q_D(QueryBuilder);
 
+    d->addClause(Clause::Column, new ColumnClause(column, this));
+
     return *this;
 }
 
-QueryBuilder &QueryBuilder::from(const QString &table)
+QueryBuilder &QueryBuilder::from(const QString &table, const QString &as)
 {
     Q_D(QueryBuilder);
-    FromClause *fc = new FromClause(table);
-    d->clauses[Clause::From] = {fc};
-    d->from = table;
+    // remove this clause?
+    FromClause *fc = new FromClause(table, as);
+    d->setClause(Clause::From, fc);
+    d->table = fc->table();
 
     return *this;
 }
@@ -310,24 +449,17 @@ QueryBuilder &QueryBuilder::from(const QString &table)
  * @param as
  * @return
  */
-QueryBuilder &QueryBuilder::fromSub(QueryBuilder *query, const QString &as)
+QueryBuilder &QueryBuilder::fromSub(const QueryBuilder &query, const QString &as)
 {
     Q_D(QueryBuilder);
-    if(as.isEmpty())
-    {
-        d->from = QString("%1").arg(query->toSql());
-    }
-    else
-    {
-        d->from = QString("(%1) as %2").arg(query->toSql()).arg(d->grammar->wrap(as));
-    }
 
-    auto bindgins = query->bindings();
-//    QStringList fromBindings = bindgins[FromBinding];
-//    foreach (auto value, fromBindings)
-//    {
-//        this->addBinding(FromBinding, value);
-//    }
+    d->table = QString("(%1) as %2").arg(query.toSql()).arg(d->grammar->wrap(as));
+
+    auto bindgins = query.bindings(FromBinding);
+    foreach (auto value, bindgins)
+    {
+        this->addBinding(FromBinding, value);
+    }
 
     return *this;
 }
@@ -345,16 +477,14 @@ QSqlQuery QueryBuilder::get(const QString &columns)
     Q_D(QueryBuilder);
 
     QList<Clause *> orignal = d->clauses.value(Clause::Column);
-    if(d->clauses[Clause::Column].isEmpty())
-    {
-        ColumnClause *col = new ColumnClause(this, columns);
-        d->clauses[Clause::Column] = {col};
-    }
 
-    // TODO: do execute query
+    if(d->hasClause(Clause::Column))
+    {
+        d->setClause(Clause::Column, new ColumnClause(columns, this));
+    }
     QSqlQuery query = d->connection->select(this->toSql());
 
-    d->clauses[Clause::Column] = orignal;
+    d->setClause(Clause::Column, orignal);
 
     return query;
 }
@@ -364,47 +494,89 @@ QSqlQuery QueryBuilder::get(const QStringList &columns)
     return this->get(columns.join(", "));
 }
 
-bool QueryBuilder::exists()
-{
-    // TODO: impl
-
-    return false;
-}
-
 QueryBuilder &QueryBuilder::join(const QString &table, const QString &first,
                                  const QString &op, const QString &second,
                                  const QString &type, bool where)
 {
     Q_D(QueryBuilder);
 
-    // TODO: IMPL
-    JoinClause *join = new JoinClause(this, type, table);
+    JoinClause *join = new JoinClause(this, type, table, where);
     where ? join->where(first, op, second) : join->on(first, op, second);
-    d->clauses[Clause::Join].append(join);
+    d->addClause(Clause::Join, join);
 
     return *this;
 }
 
-QueryBuilder &QueryBuilder::where(const QString &column, const QString &op,
+QueryBuilder &QueryBuilder::joinWhere(const QString &table, const QString &first,
+                                      const QString &op, const QString &second,
+                                      const QString &type)
+{
+    return this->join(table, first, op, second, type, true);
+}
+
+QueryBuilder &QueryBuilder::joinSub(const QueryBuilder &query, const QString &as,
+                                    const QString &first, const QString &op,
+                                    const QString &second, const QString &type, bool where)
+{
+    Q_D(QueryBuilder);
+    QString expression = QString("(%1) as %2").arg(query.toSql()).arg(d->grammar->wrap(as));
+    auto bindgins = query.bindings(JoinBinding);
+    foreach (auto value, bindgins)
+    {
+        this->addBinding(JoinBinding, value);
+    }
+
+    return this->join(expression, first, op, second, type, where);
+}
+
+QueryBuilder &QueryBuilder::where(const QString &column, const QVariant &op,
                                   const QVariant &value, const QString &boolean)
 {
     Q_D(QueryBuilder);
 
-    // TODO: value is a closure
+    // TODO: value is a closure/lambda/subquery
 
     WhereClause *where = nullptr;
-    if(invalidOperator(op))
+    if(invalidOperator(op.toString()))
     {
-        where = new WhereClause(column, QVariant(op), QString("="), boolean);
+        where = new WhereClause(WhereClause::Base, column, QString("="), op, boolean);
     }
     else
     {
-        where = new WhereClause(column, value, op, boolean);
+        where = new WhereClause(WhereClause::Base, column, op.toString(), value, boolean);
     }
-    where->setInvokableMethod("where");
-    d->clauses[Clause::Where].append(where);
+    d->addClause(Clause::Where, where);
 
     return *this;
+}
+
+QueryBuilder &QueryBuilder::where(const QVariantMap &attributes, const QString &boolean)
+{
+    QVariantMap::const_iterator it = attributes.constBegin();
+    for(; it != attributes.constEnd(); ++it)
+    {
+        if(it.value().canConvert(QVariant::Map))
+            return where(it.value().toMap(), boolean);
+
+        this->where(it.key(), "=", it.value(), boolean);
+    }
+
+    return *this;
+}
+
+QueryBuilder &QueryBuilder::where(std::function<void (const QueryBuilder &)> column,
+                                  const QString &boolean)
+{
+    Q_D(QueryBuilder);
+    return *d->whereNested(column, boolean);
+}
+
+QueryBuilder &QueryBuilder::where(const QString &column, const QString &op,
+                                  std::function<void (const QueryBuilder &)> value,
+                                  const QString &boolean)
+{
+    Q_D(QueryBuilder);
+    return *d->whereSelect(column, op, value, boolean);
 }
 
 QueryBuilder &QueryBuilder::orWhere(const QString &column, const QString &op, const QVariant &value)
@@ -416,18 +588,18 @@ QueryBuilder &QueryBuilder::whereColumn(const QString &first, const QString &op,
                                         const QString &second, const QString &boolean)
 {
     Q_D(QueryBuilder);
+
     WhereClause *where = nullptr;
     if(invalidOperator(op))
     {
-        where = new WhereClause(first, QString("="), op, boolean);
+        where = new WhereClause(WhereClause::Column, QString("="), op, boolean);
     }
     else
     {
-        where = new WhereClause(first, op, second, boolean);
+        where = new WhereClause(WhereClause::Column, first, op, second, boolean);
     }
 
-    where->setInvokableMethod("whereColumn");
-    d->clauses[Clause::Where].append(where);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -443,10 +615,8 @@ QueryBuilder &QueryBuilder::whereIn(const QString &column, const QVariant &value
     Q_D(QueryBuilder);
 
     // TODO: create sub query if value is queryable and add bindings
-
-    WhereClause *where = new WhereClause(column, value, boolean);
-    where->setInvokableMethod("whereIn");
-    d->clauses[Clause::Where].append(where);
+    WhereClause *where = new WhereClause(WhereClause::In, column, value, boolean);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -459,9 +629,9 @@ QueryBuilder &QueryBuilder::orWhereIn(const QString &column, const QVariant &val
 QueryBuilder &QueryBuilder::whereNotIn(const QString &column, const QVariant &value, const QString boolean)
 {
     Q_D(QueryBuilder);
-    WhereClause *where = new WhereClause(column, value, boolean);
-    where->setInvokableMethod("whereNotIn");
-    d->clauses[Clause::Where].append(where);
+
+    WhereClause *where = new WhereClause(WhereClause::NotIn, column, value, boolean);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -474,9 +644,9 @@ QueryBuilder &QueryBuilder::orWhereNotIn(const QString &column, const QVariant &
 QueryBuilder &QueryBuilder::whereNull(const QString &column, const QString &boolean)
 {
     Q_D(QueryBuilder);
-    WhereClause *where = new WhereClause(column, QVariant(), boolean);
-    where->setInvokableMethod("whereNull");
-    d->clauses[Clause::Where].append(where);
+
+    WhereClause *where = new WhereClause(WhereClause::Null, column, QVariant(), boolean);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -489,9 +659,9 @@ QueryBuilder &QueryBuilder::orWhereNull(const QString &column)
 QueryBuilder &QueryBuilder::whereNotNull(const QString &column, const QString boolean)
 {
     Q_D(QueryBuilder);
-    WhereClause *where = new WhereClause(column, QVariant(), boolean);
-    where->setInvokableMethod("whereNotNull");
-    d->clauses[Clause::Where].append(where);
+
+    WhereClause *where = new WhereClause(WhereClause::NotNull, column, QVariant(), boolean);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -505,9 +675,10 @@ QueryBuilder &QueryBuilder::whereBetween(const QString &column, const QVariant &
                                          const QString boolean, bool negate)
 {
     Q_D(QueryBuilder);
-    WhereClause *where = new WhereClause(column, value, boolean, !negate);
-    where->setInvokableMethod("whereBetween");
-    d->clauses[Clause::Where].append(where);
+
+    WhereClause *where = new WhereClause(negate ? WhereClause::NotBetween : WhereClause::Between,
+                                         column, value, boolean);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -520,31 +691,35 @@ QueryBuilder &QueryBuilder::orWhereBetween(const QString &column, const QVariant
 QueryBuilder &QueryBuilder::whereNotBetween(const QString &column, const QVariant &value,
                                             const QString boolean)
 {
-    return this->whereBetween(column, value, boolean, true);
+    Q_D(QueryBuilder);
+    WhereClause *where = new WhereClause(WhereClause::NotBetween, column, value, boolean);
+    d->addClause(Clause::Where, where);
+
+    return *this;
 }
 
 QueryBuilder &QueryBuilder::orWhereNotBetween(const QString &column, const QVariant &value)
 {
-    return this->whereBetween(column, value, "or", true);
+    return this->whereNotBetween(column, value, "or");
 }
 
 QueryBuilder &QueryBuilder::whereDate(const QString &column, const QString &op,
                                       const QVariant &value, const QString boolean)
 {
     Q_D(QueryBuilder);
+
     WhereClause *where = nullptr;
     if(value.type() == QVariant::String)
     {
         QDate val = QDate::fromString(value.toString(), d->grammar->dateFormat());
-        where = new WhereClause(column, val, op, boolean);
+        where = new WhereClause(WhereClause::Date, column, op, val, boolean);
     }
     else
     {
-        where = new WhereClause(column, value, op, boolean);
+        where = new WhereClause(WhereClause::Date, column, op, value, boolean);
     }
 
-    where->setInvokableMethod("whereDate");
-    d->clauses[Clause::Where].append(where);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -559,19 +734,19 @@ QueryBuilder &QueryBuilder::whereTime(const QString &column, const QString &op,
                                       const QVariant &value, const QString boolean)
 {
     Q_D(QueryBuilder);
+
     WhereClause *where = nullptr;
     if(value.type() == QVariant::String)
     {
         QDate val = QDate::fromString(value.toString(), d->grammar->datetimeFormat());
-        where = new WhereClause(column, val, op, boolean);
+        where = new WhereClause(WhereClause::Date, column, op, val, boolean);
     }
     else
     {
-        where = new WhereClause(column, value, op, boolean);
+        where = new WhereClause(WhereClause::Date, column, op, value, boolean);
     }
 
-    where->setInvokableMethod("whereTime");
-    d->clauses[Clause::Where].append(where);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -586,11 +761,12 @@ QueryBuilder &QueryBuilder::whereDay(const QString &column, const QString &op,
                                      const QVariant &value, const QString boolean)
 {
     Q_D(QueryBuilder);
+
     WhereClause *where = nullptr;
     if(value.type() == QVariant::String)
     {
         QDate val = QDate::fromString(value.toString(), Qt::ISODate);
-        where = new WhereClause(column, val.day(), op, boolean);
+        where = new WhereClause(WhereClause::Day, column, op, val.day(), boolean);
     }
     else
     {
@@ -598,11 +774,10 @@ QueryBuilder &QueryBuilder::whereDay(const QString &column, const QString &op,
         if(value.type() == QVariant::Date || value.type() == QVariant::DateTime)
             val = value.toDate().day();
 
-        where = new WhereClause(column, val, op, boolean);
+        where = new WhereClause(WhereClause::Day, column, op, val, boolean);
     }
 
-    where->setInvokableMethod("whereTime");
-    d->clauses[Clause::Where].append(where);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -616,11 +791,12 @@ QueryBuilder &QueryBuilder::whereMonth(const QString &column, const QString &op,
                                        const QVariant &value, const QString boolean)
 {
     Q_D(QueryBuilder);
+
     WhereClause *where = nullptr;
     if(value.type() == QVariant::String)
     {
         QDate val = QDate::fromString(value.toString(), Qt::ISODate);
-        where = new WhereClause(column, val.month(), op, boolean);
+        where = new WhereClause(WhereClause::Month, column, op, val.month(), boolean);
     }
     else
     {
@@ -628,11 +804,10 @@ QueryBuilder &QueryBuilder::whereMonth(const QString &column, const QString &op,
         if(value.type() == QVariant::Date || value.type() == QVariant::DateTime)
             val = value.toDate().month();
 
-        where = new WhereClause(column, val, op, boolean);
+        where = new WhereClause(WhereClause::Month, column, op, val, boolean);
     }
 
-    where->setInvokableMethod("whereMonth");
-    d->clauses[Clause::Where].append(where);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -646,11 +821,12 @@ QueryBuilder &QueryBuilder::orWhereMonth(const QString &column, const QString &o
 QueryBuilder &QueryBuilder::whereYear(const QString &column, const QString &op, const QVariant &value, const QString boolean)
 {
     Q_D(QueryBuilder);
+
     WhereClause *where = nullptr;
     if(value.type() == QVariant::String)
     {
         QDate val = QDate::fromString(value.toString(), Qt::ISODate);
-        where = new WhereClause(column, val.year(), op, boolean);
+        where = new WhereClause(WhereClause::Year, column, op, val.year(), boolean);
     }
     else
     {
@@ -658,11 +834,10 @@ QueryBuilder &QueryBuilder::whereYear(const QString &column, const QString &op, 
         if(value.type() == QVariant::Date || value.type() == QVariant::DateTime)
             val = value.toDate().year();
 
-        where = new WhereClause(column, val, op, boolean);
+        where = new WhereClause(WhereClause::Year, column, op, val, boolean);
     }
 
-    where->setInvokableMethod("whereYear");
-    d->clauses[Clause::Where].append(where);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -677,12 +852,12 @@ QueryBuilder &QueryBuilder::whereExists(std::function<void (QueryBuilder *)> cal
                                         const QString &boolean)
 {
     Q_D(QueryBuilder);
-    QueryBuilder *query = new QueryBuilder(d->connection, d->grammar);
-    callback(query);
 
-    WhereClause *where = new WhereClause(query, boolean);
-    where->setInvokableMethod("whereExists");
-    d->clauses[Clause::Where].append(where);
+    QSharedPointer<QueryBuilder> query(new QueryBuilder(d->connection));
+    callback(query.get());
+
+    WhereClause *where = new WhereClause(WhereClause::Exists, query, boolean);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -695,12 +870,12 @@ QueryBuilder &QueryBuilder::orWhereExists(std::function<void (QueryBuilder *)> c
 QueryBuilder &QueryBuilder::whereNotExists(std::function<void (QueryBuilder *)> callback, const QString &boolean)
 {
     Q_D(QueryBuilder);
-    QueryBuilder *query = new QueryBuilder(d->connection, d->grammar);
-    callback(query);
 
-    WhereClause *where = new WhereClause(query, boolean);
-    where->setInvokableMethod("whereNotExists");
-    d->clauses[Clause::Where].append(where);
+    QSharedPointer<QueryBuilder> query(new QueryBuilder(d->connection));
+    callback(query.data());
+
+    WhereClause *where = new WhereClause(WhereClause::Exists, query, boolean);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -721,9 +896,9 @@ QueryBuilder &QueryBuilder::whereRowValues(const QStringList &columns, const QSt
         return *this;
     }
 
-    WhereClause *where = new WhereClause(columns.join(", "), values, op, boolean);
-    where->setInvokableMethod("whereRowValues");
-    d->clauses[Clause::Where].append(where);
+    WhereClause *where = new WhereClause(WhereClause::RowValues, columns.join(", "),
+                                         op, values, boolean);
+    d->addClause(Clause::Where, where);
 
     return *this;
 }
@@ -737,7 +912,7 @@ QueryBuilder &QueryBuilder::groupBy(const QStringList &groups)
 {
     Q_D(QueryBuilder);
     GroupClause *group = new GroupClause(groups);
-    d->clauses[Clause::GroupBy] = {group};
+    d->setClause(Clause::GroupBy, group);
 
     return *this;
 }
@@ -746,7 +921,7 @@ QueryBuilder &QueryBuilder::groupBy(const QString &groups)
 {
     Q_D(QueryBuilder);
     GroupClause *group = new GroupClause(groups);
-    d->clauses[Clause::GroupBy] = {group};
+    d->setClause(Clause::GroupBy, group);
 
     return *this;
 }
@@ -756,7 +931,7 @@ QueryBuilder &QueryBuilder::having(const QString &column, const QString &op,
 {
     Q_D(QueryBuilder);
     HavingClause *having = new HavingClause(column, value, op, boolean);
-    d->clauses[Clause::Having] = {having};
+    d->addClause(Clause::Having, having);
 
     return *this;
 }
@@ -772,7 +947,7 @@ QueryBuilder &QueryBuilder::havingBetween(const QString &column, const QVariant 
 {
     Q_D(QueryBuilder);
     HavingClause *having = new HavingClause(column, value, boolean, !negate);
-    d->clauses[Clause::Having] = {having};
+    d->addClause(Clause::Having, having);
 
     return *this;
 }
@@ -787,7 +962,7 @@ QueryBuilder &QueryBuilder::havingNotBetween(const QString &column, const QVaria
 {
     Q_D(QueryBuilder);
     HavingClause *having = new HavingClause(column, value, boolean, false);
-    d->clauses[Clause::Having] = {having};
+    d->addClause(Clause::Having, having);
 
     return *this;
 }
@@ -807,10 +982,10 @@ QueryBuilder &QueryBuilder::orderBy(const QString &column, const QString &direct
     OrderClause *order = new OrderClause(column, direction);
 
     Clause::ClauseType type = Clause::Order;
-    if(!d->clauses[Clause::Union].isEmpty())
+    if(!d->hasClause(Clause::Union))
         type = Clause::UnionOrder;
 
-    d->clauses[type] = {order};
+    d->setClause(type, order);
 
     return *this;
 }
@@ -834,7 +1009,7 @@ QueryBuilder &QueryBuilder::offset(int value)
 {
     Q_D(QueryBuilder);
     OffsetClause *offset = new OffsetClause(value);
-    d->clauses[Clause::Offset] = {offset};
+    d->setClause(Clause::Offset, offset);
 
     return *this;
 }
@@ -843,7 +1018,7 @@ QueryBuilder &QueryBuilder::limit(int value)
 {
     Q_D(QueryBuilder);
     LimitClause *limit = new LimitClause(value);
-    d->clauses[Clause::Limit] = {limit};
+    d->setClause(Clause::Limit, limit);
 
     return *this;
 }
@@ -853,24 +1028,24 @@ QueryBuilder &QueryBuilder::forPage(int page, int perPage)
     return this->offset((page - 1) * perPage).limit(perPage);
 }
 
-QueryBuilder &QueryBuilder::UnionAt(QueryBuilder *query, bool all)
+QueryBuilder &QueryBuilder::unionAt(QueryBuilder *query, bool all)
 {
     Q_D(QueryBuilder);
     UnionClause *_union = new UnionClause(query, all);
-    d->clauses[Clause::Union] = {_union};
+    d->setClause(Clause::Union, _union);
 
     return *this;
 }
 
-QueryBuilder &QueryBuilder::UnionAll(QueryBuilder *query)
+QueryBuilder &QueryBuilder::unionAll(QueryBuilder *query)
 {
-    return this->UnionAt(query, true);
+    return this->unionAt(query, true);
 }
 
 int QueryBuilder::aggregate(const QString &function, const QString &column)
 {
     Q_D(QueryBuilder);
-    if(d->clauses[Clause::Union].isEmpty())
+    if(d->hasClause(Clause::Union))
     {
         d->removeClause(Clause::Column);
         d->removeBindings(QueryBuilder::SelectBinding);
@@ -927,7 +1102,7 @@ int QueryBuilder::average(const QString &column)
     }
 
 DEFINED_MEMBER(bindings, BindingsHash);
-DEFINED_MEMBER(from, QString);
+DEFINED_MEMBER(table, QString);
 DEFINED_MEMBER(isDistincted, bool);
 DEFINED_MEMBER(isAggregated, bool);
 

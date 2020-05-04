@@ -1,6 +1,6 @@
 #include "SQLiteConnection.h"
 #include "Connection_p.h"
-#include "query/QueryGrammar.h"
+#include "query/SQLiteQueryGrammar.h"
 #include "schema/SQLiteSchemaGrammar.h"
 
 class SQLiteConnectionPrivate : public ConnectionPrivate
@@ -15,22 +15,15 @@ SQLiteConnection::SQLiteConnection(const QString &prefix)
 
 }
 
-Grammar *SQLiteConnection::queryGrammar()
+Grammar *SQLiteConnection::createScheamGrammar()
 {
-    // TODO: create SqliteQueryGrammar
-
-    return new QueryGrammar();
-}
-
-Grammar *SQLiteConnection::schemaGrammar()
-{
-/*
     Q_D(SQLiteConnection);
     auto grammar = new SQLiteSchemaGrammar;
     grammar->setTablePrefix(d->tablePrefix);
     return grammar;
-*/
+}
 
-    // be auto free (see SchemaBuilder::build())
-    return this->withTablePrefix(new SQLiteSchemaGrammar);
+Grammar *SQLiteConnection::createQueryGrammar()
+{
+    return this->withTablePrefix(new SQLiteQueryGrammar());
 }

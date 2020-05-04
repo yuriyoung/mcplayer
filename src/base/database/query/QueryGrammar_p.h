@@ -10,11 +10,13 @@ class QueryGrammarPrivate : public GrammarPrivate
 public:
     QueryGrammarPrivate(Grammar *q);
 
+     static const QMap<int, QByteArray> &defaultSelectClauaseNames();
+
     QStringList compileClauses(QueryBuilder *builder) const;
     QString compileClauses(QueryBuilder *builder, Clause::ClauseType type) const;
 
     // remove first "and" or "or"
-    QString removeLeadingBoolean(const QStringList clauses) const;
+    QString removeLeadingBoolean(const QString clause) const;
     QString dateWhere(const QString &type, WhereClause *where) const;
 };
 

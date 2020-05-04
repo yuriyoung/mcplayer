@@ -1,38 +1,26 @@
 #ifndef QUERYGRAMMAR_H
 #define QUERYGRAMMAR_H
 
-#include "../Grammar.h"
+#include "Grammar.h"
 #include "Clause.h"
 
 #include <QVariant>
 
-class QueryGrammarPrivate;
 class QueryBuilder;
+class QueryGrammarPrivate;
 class QueryGrammar : public Grammar
 {
     Q_OBJECT
     Q_DECLARE_PRIVATE(QueryGrammar)
-    friend class AggregateClause;
-    friend class ColumnClause;
-    friend class FromClause;
-    friend class JoinClause;
-    friend class WhereClause;
-    friend class OrderClause;
-    friend class GroupClause;
-    friend class HavingClause;
-    friend class UnionClause;
-    friend class LimitClause;
-    friend class OffsetClause;
-
 public:
     using Records = QList< QVariantMap >;
 
     QueryGrammar(QObject *parent = nullptr);
     ~QueryGrammar() override;
 
-    virtual QStringList compile(void *data) override;
+    virtual QStringList compile(void *builder, int type) override;
 
-    virtual QString compileSelect(QueryBuilder *builder);
+    virtual QString compileSelect(QueryBuilder *builder) const;
     virtual QString compileInsert(QueryBuilder *builder, const Records &values);
     virtual QString compileUpdate(QueryBuilder *builder, const Records &values);
     virtual QString compileDelete(QueryBuilder *builder);
@@ -42,12 +30,11 @@ public:
     virtual QString compileSavepoint(const QString &name);
     virtual QString compileRollBack(const QString &name);
 
-protected:
     /**
-     * compile clause components (interept by clause)
+     * compile clause components (interpret by clause)
      */
     virtual QString clauseAggregate(AggregateClause *ac) const;
-    virtual QString clauseColumns(ColumnClause *cc) const;
+    virtual QString clauseColumn(ColumnClause *cc) const;
     virtual QString clauseFrom(FromClause *fc) const;
     virtual QString clauseWhere(WhereClause *where);
     virtual QString clauseHaving(HavingClause *having) const;
@@ -86,6 +73,9 @@ protected:
 
     // other invokble clauses in sub-class
     // ...
+
+protected:
+    void removeClause(QueryBuilder *builder, Clause::ClauseType type);
 };
 
 #endif // QUERYGRAMMAR_H

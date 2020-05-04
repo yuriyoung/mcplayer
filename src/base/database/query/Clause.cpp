@@ -1,52 +1,100 @@
 #include "Clause.h"
+#include "QueryBuilder.h"
+#include "QueryGrammar.h"
 
 #include <QSharedData>
 #include <QMetaMethod>
 #include <QDebug>
 
+namespace  {
+    struct WhereClauseLookupNames : public QHash<int, QByteArray>
+    {
+        WhereClauseLookupNames()
+        {
+            (*this)[WhereClause::Base] = "where";
+            (*this)[WhereClause::In] = "whereIn";
+            (*this)[WhereClause::NotIn] = "whereNotIn";
+            (*this)[WhereClause::InRaw] = "whereInRaw";
+            (*this)[WhereClause::NotInRaw] = "whereNotInRaw";
+            (*this)[WhereClause::Null] = "whereNull";
+            (*this)[WhereClause::NotNull] = "whereNotNull";
+            (*this)[WhereClause::Between] = "whereBetween";
+            (*this)[WhereClause::NotBetween] = "whereNotBetween";
+            (*this)[WhereClause::Nested] = "whereNested";
+            (*this)[WhereClause::Column] = "whereColumn";
+            (*this)[WhereClause::Date] = "whereDate";
+            (*this)[WhereClause::Time] = "whereTime";
+            (*this)[WhereClause::Day] = "whereDay";
+            (*this)[WhereClause::Month] = "whereMonth";
+            (*this)[WhereClause::Year] = "whereYear";
+            (*this)[WhereClause::Exists] = "whereExists";
+            (*this)[WhereClause::NotExists] = "whereNotExists";
+            (*this)[WhereClause::RowValues] = "whereRowValues";
+            (*this)[WhereClause::Sub] = "whereSub";
+            (*this)[WhereClause::JsonBoolean] = "whereJsonBoolean";
+            (*this)[WhereClause::JsonContains] = "whereJsonContains";
+        }
+    };
+}
+
+Q_GLOBAL_STATIC(WhereClauseLookupNames, g_whereLookupNames)
+
+class ClausePrivate : public QSharedData
+{
+public:
+    ClausePrivate() { }
+    ClausePrivate(const ClausePrivate &other) : QSharedData(other) { }
+    virtual ~ClausePrivate() {}
+
+public:
+    QueryBuilder *parent = nullptr;
+    QStringList columns;
+    Clause *following = nullptr;
+};
+
 class FromClausePrivate : public ClausePrivate
 {
 public:
     QString table;
-    QString as;
     QVariantMap bindings;
 };
 
 class AggregateClausePrivate : public ClausePrivate
 {
 public:
-    QueryBuilder *query = nullptr;
     QString function;
 };
 
 class ColumnClausePrivate : public ClausePrivate
 {
 public:
-    QueryBuilder *query = nullptr;
     // TODO: bindings ?
+    QueryBuilder subQuery;
+    QString as;
 };
 
 class JoinClausePrivate : public ClausePrivate
 {
 public:
     QString table; // The table the join clause is joining to.
-    QString type; // The type of join being performed.
-    QSharedPointer<QueryBuilder> query = nullptr;
+    JoinClause::Type type = JoinClause::Inner; // The type of join being performed.
+    bool isWhere = false;
     QList<JoinClause *> joins;
+    QSharedPointer<QueryBuilder> subQuery;
 };
 
 class WhereClausePrivate : public ClausePrivate
 {
 public:
+    int type = WhereClause::Base;
     QString method;
     QString op;
     QString boolean;
-    QString first;
-    QString second;
+//    QString first;
+//    QString second;
     QVariant value;
-    bool betweenOrNotBetween = false;
-    QSharedPointer<QueryBuilder> query = nullptr;
-//    QueryBuilder *query = nullptr;
+    bool isLeading = false;
+    QSharedPointer<QueryBuilder> subQuery;
 };
 
 class HavingClausePrivate : public ClausePrivate
@@ -58,6 +106,7 @@ public:
     QString op;
     bool betweenOrNot = true; // default is between
     bool _between = false;
+    bool isLeading = false;
 };
 
 class GroupClausePrivate : public ClausePrivate
@@ -70,12 +119,12 @@ class OrderClausePrivate : public ClausePrivate
 {
 public:
     QString direction;
+    bool isLeading = false;
 };
 
 class UnionClausePrivate : public ClausePrivate
 {
 public:
-    QueryBuilder *query = nullptr;
     bool all = false;
 };
 
@@ -96,21 +145,16 @@ public:
  * interfaces implementation
  * ***********************************************
  */
-//template<typename P>
-Clause::Clause() : Clause(*new ClausePrivate)
+Clause::Clause(QueryBuilder *parent)
+    : Clause(*new ClausePrivate, parent)
 {
 
 }
 
-Clause::Clause(const QStringList &columns)
-    : Clause(*new ClausePrivate(columns))
+Clause::Clause(ClausePrivate &dd, QueryBuilder *parent)
+    : d_ptr(&dd)
 {
-
-}
-
-Clause::Clause(ClausePrivate &dd): d_ptr(&dd)
-{
-
+    d_ptr->parent = parent;
 }
 
 Clause::~Clause()
@@ -118,20 +162,9 @@ Clause::~Clause()
     qDebug() << "Clause::~Clause()";
 }
 
-void Clause::setBindings(const QVariantMap &bindings)
-{
-    Q_D(Clause);
-    d->bindings = bindings;
-}
-
-QVariantMap Clause::bindings() const
-{
-    Q_D(const Clause);
-    return d->bindings;
-}
-
 void Clause::setColumns(const QString &columns)
 {
+    Q_UNUSED(columns)
     QStringList list = columns.split(",", QString::SkipEmptyParts);
     this->setColumns(list);
 }
@@ -139,11 +172,11 @@ void Clause::setColumns(const QString &columns)
 void Clause::setColumns(const QStringList &columns)
 {
     Q_D(Clause);
-    if(columns.isEmpty())
-    {
-        d->columns = QStringList("*");
-        return ;
-    }
+//    if(columns.isEmpty())
+//    {
+//        d->columns = QStringList("*");
+//        return ;
+//    }
 
     d->columns.clear();
     foreach (auto &val, columns)
@@ -156,6 +189,12 @@ QStringList Clause::columns() const
     return d->columns;
 }
 
+QueryBuilder *Clause::query() const
+{
+    Q_D(const Clause);
+    return d->parent;
+}
+
 /**
  * @brief FromClause::FromClause
  * @param table
@@ -165,18 +204,13 @@ FromClause::FromClause(const QString &table, const QString &as,
     : Clause(*new FromClausePrivate)
 {
     Q_D(FromClause);
-    d->table = table;
-    d->as = as;
+    d->table = as.isEmpty() ? table : table + " as " + as;
     d->bindings = bindings;
 }
 
-FromClause::FromClause(const FromClause &other)
+QString FromClause::interpret(QueryGrammar *grammar, bool leading)
 {
-    d_ptr = other.d_ptr;
-}
-
-QString FromClause::interept(QueryGrammar *grammar)
-{
+    Q_UNUSED(leading)
     return grammar->clauseFrom(this);
 }
 
@@ -184,12 +218,6 @@ QString FromClause::table() const
 {
     Q_D(const FromClause);
     return d->table;
-}
-
-QString FromClause::as() const
-{
-    Q_D(const FromClause);
-    return d->as;
 }
 
 QVariantMap FromClause::bindings() const
@@ -202,22 +230,28 @@ QVariantMap FromClause::bindings() const
  * @brief AggregateClause::AggregateClause
  * @param function
  */
-AggregateClause::AggregateClause(QueryBuilder *query, const QString &function, const QString &columns)
-    : Clause(*new AggregateClausePrivate())
+AggregateClause::AggregateClause(QueryBuilder *parent,
+                                 const QString &function, const QString &columns)
+    : Clause(*new AggregateClausePrivate(), parent)
 {
     Q_D(AggregateClause);
-    d->query = query;
     d->function = function;
     setColumns(columns);
 }
 
-AggregateClause::AggregateClause(QueryBuilder *query, const QString &function, const QStringList &columns)
-    : Clause(*new AggregateClausePrivate())
+AggregateClause::AggregateClause(QueryBuilder *parent,
+                                 const QString &function, const QStringList &columns)
+    : Clause(*new AggregateClausePrivate(), parent)
 {
     Q_D(AggregateClause);
-    d->query = query;
     d->function = function;
     setColumns(columns);
+}
+
+QString AggregateClause::interpret(QueryGrammar *grammar, bool leading)
+{
+    Q_UNUSED(leading)
+    return grammar->clauseAggregate(this);
 }
 
 QString AggregateClause::function() const
@@ -226,46 +260,35 @@ QString AggregateClause::function() const
     return d->function;
 }
 
-QueryBuilder *AggregateClause::query() const
-{
-    Q_D(const AggregateClause);
-    return d->query;
-}
-
 /**
  * @brief ColumnClause::ColumnClause
  * @param columns
  */
-ColumnClause::ColumnClause(QueryBuilder *query, const QString &columns)
-    : Clause(*new ColumnClausePrivate)
+ColumnClause::ColumnClause(const QString &columns, QueryBuilder *parent)
+    : Clause(*new ColumnClausePrivate, parent)
 {
-    Q_D(ColumnClause);
-    d->query = query;
     setColumns(columns);
 }
 
-ColumnClause::ColumnClause(QueryBuilder *query, const QStringList &columns)
-    : Clause(*new ColumnClausePrivate)
+ColumnClause::ColumnClause(const QStringList &columns, QueryBuilder *parent)
+    : Clause(*new ColumnClausePrivate, parent)
 {
-    Q_D(ColumnClause);
-    d->query = query;
     setColumns(columns);
 }
 
-ColumnClause::ColumnClause(const ColumnClause &other)
+ColumnClause::ColumnClause(const QueryBuilder &subQuery, const QString &as,
+                           QueryBuilder *parent)
+    : Clause(*new ColumnClausePrivate, parent)
 {
-    d_ptr = other.d_ptr;
+    Q_D(ColumnClause);
+    d->subQuery = subQuery;
+    d->as = as;
 }
 
-QString ColumnClause::interept(QueryGrammar *grammar)
+QString ColumnClause::interpret(QueryGrammar *grammar, bool leading)
 {
-    return grammar->clauseColumns(this);
-}
-
-QueryBuilder *ColumnClause::query() const
-{
-    Q_D(const ColumnClause);
-    return d->query;
+    Q_UNUSED(leading)
+    return grammar->clauseColumn(this);
 }
 
 /**
@@ -274,38 +297,51 @@ QueryBuilder *ColumnClause::query() const
  * @param type
  * @param table
  */
-JoinClause::JoinClause(QueryBuilder *parent, const QString &type,
-                       const QString &table)
-    : Clause(*new JoinClausePrivate)
+JoinClause::JoinClause(QueryBuilder *parent, JoinClause::Type type,
+                       const QString &table, bool where)
+    : Clause(*new JoinClausePrivate, parent)
 {
     Q_D(JoinClause);
-    d->query.reset(new QueryBuilder(parent->connection(), parent->grammar()));
     d->type = type;
     d->table = table;
+    d->isWhere = where;
+    d->subQuery = QSharedPointer<QueryBuilder>::create(parent->connection());
 }
 
-QString JoinClause::interept(QueryGrammar *grammar)
+JoinClause::JoinClause(QueryBuilder *parent, const QString &type,
+                       const QString &table, bool where)
+    : Clause(*new JoinClausePrivate(), parent)
 {
+    Q_D(JoinClause);
+    d->type = JoinClause::Type(QStringList({"inner", "left", "right", "cross"}).indexOf(type.toLower()));
+    d->table = table;
+    d->isWhere = where;
+    d->subQuery = QSharedPointer<QueryBuilder>::create(parent->connection());
+}
+
+QString JoinClause::interpret(QueryGrammar *grammar, bool leading)
+{
+    Q_UNUSED(leading)
     return grammar->clauseJoin(this);
-}
-
-QString JoinClause::table() const
-{
-    Q_D(const JoinClause);
-    return d->table;
-}
-
-QString JoinClause::joinType() const
-{
-    Q_D(const JoinClause);
-    return d->type;
 }
 
 QueryBuilder &JoinClause::on(const QString &first, const QString &op,
                        const QString &second, const QString &boolean)
 {
     Q_D(JoinClause);
-    return d->query->whereColumn(first, op, second, boolean);
+
+    // TODO: (remove?) the table name provided by the user?
+    const QString one = d->parent->table() + "." + first;
+    const QString two = d->table + "." + second;
+
+    return d->subQuery->whereColumn(one, op, two, boolean);
+}
+
+QueryBuilder &JoinClause::on(std::function<void (const QueryBuilder &)> column,
+                             const QString &boolean)
+{
+    Q_D(JoinClause);
+    return d->subQuery->where(column, boolean);
 }
 
 QueryBuilder &JoinClause::orOn(const QString &first, const QString &op,
@@ -318,13 +354,39 @@ QueryBuilder &JoinClause::where(const QString &first, const QString &op,
                           const QString &second, const QString &boolean)
 {
     Q_D(JoinClause);
-    return d->query->where(first, op, second, boolean);
+    return d->subQuery->where(first, op, second, boolean);
 }
 
-QueryBuilder *JoinClause::query() const
+QSharedPointer<QueryBuilder> JoinClause::subQuery() const
 {
     Q_D(const JoinClause);
-    return d->query.get();
+    return d->subQuery;
+}
+
+QString JoinClause::table() const
+{
+    Q_D(const JoinClause);
+    return d->table;
+}
+
+QString JoinClause::joinType() const
+{
+    Q_D(const JoinClause);
+    switch (d->type)
+    {
+    case Inner: return "inner";
+    case Left: return "left";
+    case Right: return "right";
+    case Cross: return "cross";
+    }
+
+    return "inner";
+}
+
+bool JoinClause::isWhere() const
+{
+    Q_D(const JoinClause);
+    return d->isWhere;
 }
 
 QList<JoinClause *> JoinClause::joins() const
@@ -336,12 +398,75 @@ QList<JoinClause *> JoinClause::joins() const
 /**
  * @brief WhereClause::WhereClause
  */
-WhereClause::WhereClause(QueryBuilder *query, const QString &boolean)
+WhereClause::WhereClause(WhereClause::Type type,
+                         const QString &column,
+                         const QString &op,
+                         const QueryBuilder &subQuery,
+                         const QString &boolean)
     : Clause(*new WhereClausePrivate)
 {
     Q_D(WhereClause);
-    d->query.reset(query);
+    d->type = type;
+    d->op = op;
+    d->subQuery = QSharedPointer<QueryBuilder>::create(subQuery);
     d->boolean = boolean;
+    setColumns(column);
+}
+
+WhereClause::WhereClause(Type type,
+                         const QSharedPointer<QueryBuilder> &subQuery,
+                         const QString &boolean)
+    : Clause(*new WhereClausePrivate)
+{
+    Q_D(WhereClause);
+    d->type = type;
+    d->subQuery = subQuery;
+    d->boolean = boolean;
+}
+
+WhereClause::WhereClause(WhereClause::Type type,
+                         const QueryBuilder &subQuery,
+                         const QString &boolean)
+    : Clause(*new WhereClausePrivate)
+{
+    Q_D(WhereClause);
+    d->type = type;
+    d->subQuery = QSharedPointer<QueryBuilder>::create(subQuery);
+    d->boolean = boolean;
+}
+
+WhereClause::WhereClause(WhereClause::Type type, const QString &column,
+                         const QString &op, const QVariant &value,
+                         const QString &boolean)
+    : Clause(*new WhereClausePrivate)
+{
+    Q_D(WhereClause);
+    d->type = type;
+    d->value = value;
+    d->op = op;
+    d->boolean = boolean;
+    setColumns(column);
+}
+
+WhereClause::WhereClause(WhereClause::Type type, const QString &column,
+                         const QVariant &value, const QString &boolean)
+    : Clause(*new WhereClausePrivate)
+{
+    Q_D(WhereClause);
+    d->type = type;
+    d->value = value;
+    d->boolean = boolean;
+    setColumns(column);
+}
+
+/*
+WhereClause::WhereClause(QSharedPointer<QueryBuilder> query, const QString &boolean)
+    : Clause(*new WhereClausePrivate)
+{
+    Q_D(WhereClause);
+    d->query = query.data();
+    d->boolean = boolean;
+    d->op = "=";
 }
 
 WhereClause::WhereClause(const QString &column, const QVariant &value,
@@ -386,31 +511,37 @@ WhereClause::WhereClause(const QString &column, const QVariant &value,
     d->boolean = boolean;
     d->betweenOrNotBetween = betweenOrNotBetween;
 }
+*/
 
-QString WhereClause::interept(QueryGrammar *grammar)
+QString WhereClause::interpret(QueryGrammar *grammar, bool leading)
 {
+    Q_D(WhereClause);
+    d->isLeading = leading;
     return grammar->clauseWhere(this);
 }
 
-void WhereClause::setInvokableMethod(const QString &method)
+void WhereClause::setParentQuery(QueryBuilder *parent)
 {
     Q_D(WhereClause);
-    d->method = method;
-
-//    if(method != "where")
-//        d->method = d->method.replace(0, 1, method[0].toUpper());
+    d->parent = parent;
 }
 
-QString WhereClause::invokableMethod() const
+QString WhereClause::whereMethod() const
 {
     Q_D(const WhereClause);
-    return d->method;
+    return g_whereLookupNames->value(d->type);
 }
 
-bool WhereClause::betweenOrNot() const
+int WhereClause::type() const
 {
     Q_D(const WhereClause);
-    return d->betweenOrNotBetween;
+    return d->type;
+}
+
+bool WhereClause::leading() const
+{
+    Q_D(const WhereClause);
+    return d->isLeading;
 }
 
 QVariant WhereClause::value() const
@@ -434,19 +565,19 @@ QString WhereClause::boolean()
 QString WhereClause::first() const
 {
     Q_D(const WhereClause);
-    return d->first;
+    return d->columns.first();
 }
 
 QString WhereClause::second() const
 {
     Q_D(const WhereClause);
-    return d->first;
+    return d->value.toString();
 }
 
-QueryBuilder *WhereClause::query() const
+QSharedPointer<QueryBuilder> WhereClause::subQuery() const
 {
     Q_D(const WhereClause);
-    return d->query.get();
+    return d->subQuery;
 }
 
 /**
@@ -479,9 +610,11 @@ HavingClause::HavingClause(const QString &column, const QVariant &value,
     d->betweenOrNot = betweenOrNotBetween;
 }
 
-QString HavingClause::interept(QueryGrammar *grammar)
+QString HavingClause::interpret(QueryGrammar *grammar, bool leading)
 {
-    Q_D(const HavingClause);
+    Q_D(HavingClause);
+    d->isLeading = leading;
+
     if(d->_between)
     {
          return grammar->clauseHavingBetween(this);
@@ -516,6 +649,12 @@ bool HavingClause::betweenOrNot() const
     return d->betweenOrNot;
 }
 
+bool HavingClause::leading() const
+{
+    Q_D(const HavingClause);
+    return d->isLeading;
+}
+
 /**
  * @brief GroupClause::GroupClause
  * @param columns
@@ -532,8 +671,9 @@ GroupClause::GroupClause(const QStringList &columns)
     setColumns(columns);
 }
 
-QString GroupClause::interept(QueryGrammar *grammar)
+QString GroupClause::interpret(QueryGrammar *grammar, bool leading)
 {
+    Q_UNUSED(leading)
     return grammar->clauseGroup(this);
 }
 
@@ -558,8 +698,10 @@ OrderClause::OrderClause(const QStringList &columns, const QString &direction)
     d->direction = direction;
 }
 
-QString OrderClause::interept(QueryGrammar *grammar)
+QString OrderClause::interpret(QueryGrammar *grammar, bool leading)
 {
+    Q_D(OrderClause);
+    d->isLeading = leading;
     return grammar->clauseOrder(this);
 }
 
@@ -569,28 +711,28 @@ QString OrderClause::direction() const
     return d->direction;
 }
 
+bool OrderClause::leading() const
+{
+    Q_D(const OrderClause);
+    return d->isLeading;
+}
+
 /**
  * @brief UnionClause::UnionClause
  * @param query
  * @param all
  */
 UnionClause::UnionClause(QueryBuilder *query, bool all)
-    : Clause(*new UnionClausePrivate)
+    : Clause(*new UnionClausePrivate, query)
 {
     Q_D(UnionClause);
-    d->query = query;
     d->all = all;
 }
 
-QString UnionClause::interept(QueryGrammar *grammar)
+QString UnionClause::interpret(QueryGrammar *grammar, bool leading)
 {
+    Q_UNUSED(leading)
     return grammar->clauseUnion(this);
-}
-
-QueryBuilder *UnionClause::query() const
-{
-    Q_D(const UnionClause);
-    return d->query;
 }
 
 bool UnionClause::all() const
@@ -610,12 +752,13 @@ LimitClause::LimitClause(int limit)
     d->limit = qMax(0, limit);
 }
 
-QString LimitClause::interept(QueryGrammar *grammar)
+QString LimitClause::interpret(QueryGrammar *grammar, bool leading)
 {
+    Q_UNUSED(leading)
     return grammar->clauseLimit(this);
 }
 
-int LimitClause::limit() const
+int LimitClause::value() const
 {
     Q_D(const LimitClause);
     return d->limit;
@@ -632,12 +775,13 @@ OffsetClause::OffsetClause(int offset)
     d->offset = qMax(0, offset);
 }
 
-QString OffsetClause::interept(QueryGrammar *grammar)
+QString OffsetClause::interpret(QueryGrammar *grammar, bool leading)
 {
+    Q_UNUSED(leading)
     return grammar->clauseOffset(this);
 }
 
-int OffsetClause::offset() const
+int OffsetClause::value() const
 {
     Q_D(const OffsetClause);
     return d->offset;

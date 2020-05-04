@@ -38,39 +38,39 @@ protected slots:
     virtual QString typeMacAddress(const ColumnDefinition &column) const;
 
 protected:
-    virtual QString compileTableExists(Blueprint *blueprint, const Command &command);
-    virtual QString compileColumnListing(Blueprint *blueprint, const Command &command);
-    virtual QString compileEnableForeignKeyConstraints(Blueprint *blueprint, const Command &command);
-    virtual QString compileDisableForeignKeyConstraints(Blueprint *blueprint, const Command &command);
+    virtual QString compileTableExists(const Command &command);
+    virtual QString compileColumnListing(const Command &command);
+    virtual QString compileEnableForeignKeyConstraints(const Command &command);
+    virtual QString compileDisableForeignKeyConstraints(const Command &command);
 
     // Compile a create table command.
-    virtual QString compileCreate(Blueprint *blueprint, const Command &command);
+    virtual QString compileCreate(const Command &command);
     // Compile alter table commands for adding columns.
-    virtual QString compileAdd(Blueprint *blueprint, const Command &command);
-    virtual QString compileChange(Blueprint *blueprint, const Command &command);
-    virtual QString compileForeign(Blueprint *blueprint, const Command &command);
+    virtual QString compileAdd(const Command &command);
+    virtual QString compileChange(const Command &command);
+    virtual QString compileForeign(const Command &command);
 
-    virtual QString compileRename(Blueprint *blueprint, const Command &command);
-    virtual QString compileRenameIndex(Blueprint *blueprint, const Command &command);
+    virtual QString compileRename(const Command &command);
+    virtual QString compileRenameIndex(const Command &command);
 
-    virtual QString compilePrimary(Blueprint *blueprint, const Command &command);
-    virtual QString compileUnique(Blueprint *blueprint, const Command &command);
-    virtual QString compileIndex(Blueprint *blueprint, const Command &command);
-    virtual QString compileSpatialIndex(Blueprint *blueprint, const Command &command);
+    virtual QString compilePrimary(const Command &command);
+    virtual QString compileUnique(const Command &command);
+    virtual QString compileIndex(const Command &command);
+    virtual QString compileSpatialIndex(const Command &command);
 
-    virtual QString compileDrop(Blueprint *blueprint, const Command &command);
-    virtual QString compileDropIfExists(Blueprint *blueprint, const Command &command);
-    virtual QString compileDropColumn(Blueprint *blueprint, const Command &command); // TODO:remove
-    virtual QString compileDropPrimary(Blueprint *blueprint, const Command &command);
-    virtual QString compileDropUnique(Blueprint *blueprint, const Command &command);
-    virtual QString compileDropIndex(Blueprint *blueprint, const Command &command);
-    virtual QString compileDropSpatialIndex(Blueprint *blueprint, const Command &command); // TODO:remove
-    virtual QString compileDropForeign(Blueprint *blueprint, const Command &command); // TODO:remove
-    virtual QString compileDropAllTables(Blueprint *blueprint, const Command &command);
+    virtual QString compileDrop(const Command &command);
+    virtual QString compileDropIfExists(const Command &command);
+    virtual QString compileDropColumn(const Command &command); // TODO:remove
+    virtual QString compileDropPrimary(const Command &command);
+    virtual QString compileDropUnique(const Command &command);
+    virtual QString compileDropIndex(const Command &command);
+    virtual QString compileDropSpatialIndex(const Command &command); // TODO:remove
+    virtual QString compileDropForeign(const Command &command); // TODO:remove
+    virtual QString compileDropAllTables(const Command &command);
     virtual QString compileDropAllViews(...);
     virtual QString compileRebuild() { return "vacuum"; }
 
-    virtual QString applyModifiers(Blueprint *blueprint, const ColumnDefinition &column) const;
+    virtual QString applyModifiers(const ColumnDefinition &column) const;
 };
 
 #endif // SQLITESCHEMAGRAMMAR_H
