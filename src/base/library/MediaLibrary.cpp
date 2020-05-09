@@ -113,7 +113,7 @@ bool MediaLibrary::supportedMediaExtension(const QString &ext)
     return std::binary_search(std::begin(supportedMediaExtensions),
                               std::end(supportedMediaExtensions),
                               ext.toLatin1().data(),
-                              [](const char *l, const char *r){ return _stricmp(l, r) < 0;});
+                              [](const char *l, const char *r){ return qstricmp(l, r) < 0;});
 }
 
 bool MediaLibrary::supportedPlaylistExtension(const QString &ext)
@@ -121,5 +121,5 @@ bool MediaLibrary::supportedPlaylistExtension(const QString &ext)
     return std::binary_search(std::begin(supportedPlaylistExtensions),
                               std::end(supportedPlaylistExtensions),
                               ext.toLatin1().data(),
-                              [](const char *l, const char *r){ return _stricmp(l, r) < 0;});
+                              [](const char *l, const char *r){ return qstricmp(l, r) < 0;});
 }
