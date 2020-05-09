@@ -32,3 +32,6 @@ DEFINES += RC_VERSION=$$replace(MCPLAYER_VERSION, "\\.", ","),0 \
         RC_DESCRIPTION_STRING=\"$$replace(DESCRIPTION, " ", "\\x20")\" \
         RC_COPYRIGHT=\"$$replace(COPYRIGHT, " ", "\\x20")\"
 RC_FILE = mcplayer.rc
+
+LIBS *= -L$$MCPLAYER_LIBRARY_PATH \
+        -L$$MCPLAYER_SOURCE_TREE/3rdparty/vlc/lib -llibvlc -llibvlccore

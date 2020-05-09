@@ -45,8 +45,6 @@ QT_QUICK_CONTROLS_CONF=:/qtquickcontrols2.conf
 # path to vlc library
 INCLUDEPATH += $$MCPLAYER_SOURCE_TREE/src \
         $$MCPLAYER_SOURCE_TREE/3rdparty/vlc/include
-LIBS *= -L$$MCPLAYER_LIBRARY_PATH \
-        -L$$MCPLAYER_SOURCE_TREE/3rdparty/vlc/lib -llibvlc -llibvlccore
 
 message(LIBS $$LIBS)
 message(TARGET $$TARGET)

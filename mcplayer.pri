@@ -56,69 +56,6 @@ message(mcplayer $$MCPLAYER_SOURCE_TREE $$MCPLAYER_BUILD_TREE)
 
 APP_PATH = $$MCPLAYER_SOURCE_TREE/bin
 
-osx {
-    APP_TARGET = "$$APP_DISPLAY_NAME"
-
-    # check if BUILD_TREE is actually an existing McPlayer.app,
-    # for building against a binary package
-    exists($$MCPLAYER_BUILD_TREE/Contents/MacOS/$$APP_TARGET): APP_BUNDLE = $$MCPLAYER_BUILD_TREE
-    else: APP_BUNDLE = $$APP_PATH/$${APP_TARGET}.app
-
-    # set output path if not set manually
-    isEmpty(APP_OUTPUT_PATH): APP_OUTPUT_PATH = $$APP_BUNDLE/Contents
-
-    MCPLAYER_LIBRARY_PATH = $$APP_OUTPUT_PATH/Frameworks
-    MCPLAYER_PLUGIN_PATH  = $$APP_OUTPUT_PATH/PlugIns
-    MCPLAYER_LIBEXEC_PATH = $$APP_OUTPUT_PATH/Resources
-    MCPLAYER_DATA_PATH    = $$APP_OUTPUT_PATH/Resources
-    MCPLAYER_DOC_PATH     = $$APP_DATA_PATH/doc
-    MCPLAYER_BIN_PATH     = $$APP_OUTPUT_PATH/MacOS
-
-    contains(QT_CONFIG, ppc):CONFIG += ppc x86
-    copydata = 1
-
-    INSTALL_LIBRARY_PATH = $$APP_PREFIX/$${APP_TARGET}.app/Contents/Frameworks
-    INSTALL_PLUGIN_PATH  = $$APP_PREFIX/$${APP_TARGET}.app/Contents/PlugIns
-    INSTALL_LIBEXEC_PATH = $$APP_PREFIX/$${APP_TARGET}.app/Contents/Resources
-    INSTALL_DATA_PATH    = $$APP_PREFIX/$${APP_TARGET}.app/Contents/Resources
-    INSTALL_DOC_PATH     = $$INSTALL_DATA_PATH/doc
-    INSTALL_BIN_PATH     = $$APP_PREFIX/$${APP_TARGET}.app/Contents/MacOS
-    INSTALL_APP_PATH     = $$APP_PREFIX/
-} else {
-    APP_TARGET = $$APP_ID
-    
-    # 如果没有手动设置目标输出路径
-    isEmpty(APP_OUTPUT_PATH): APP_OUTPUT_PATH = $$MCPLAYER_BUILD_TREE
-
-    MCPLAYER_LIBRARY_PATH = $$APP_OUTPUT_PATH/$$MCPLAYER_LIBRARY_BASENAME/mcplayer
-    MCPLAYER_PLUGIN_PATH  = $$MCPLAYER_LIBRARY_PATH/plugins
-    MCPLAYER_DATA_PATH    = $$APP_OUTPUT_PATH/share/mcplayer
-    MCPLAYER_DOC_PATH     = $$APP_OUTPUT_PATH/share/doc/mcplayer
-    MCPLAYER_BIN_PATH     = $$APP_OUTPUT_PATH/bin
-
-    win32: \
-        APP_LIBEXEC_PATH = $$APP_OUTPUT_PATH/bin
-    else: \
-        APP_LIBEXEC_PATH = $$APP_OUTPUT_PATH/libexec/mcplayer
-
-    INSTALL_LIBRARY_PATH = $$APP_PREFIX/$$MCPLAYER_LIBRARY_BASENAME/mcplayer
-    INSTALL_PLUGIN_PATH  = $$INSTALL_LIBRARY_PATH/plugins
-    win32: \
-        INSTALL_LIBEXEC_PATH = $$APP_PREFIX/bin
-    else: \
-        INSTALL_LIBEXEC_PATH = $$APP_PREFIX/libexec/mcplayer
-    INSTALL_DATA_PATH    = $$APP_PREFIX/share/mcplayer
-    INSTALL_DOC_PATH     = $$APP_PREFIX/share/doc/mcplayer
-    INSTALL_BIN_PATH     = $$APP_PREFIX/bin
-    INSTALL_APP_PATH     = $$APP_PREFIX/bin
-}
-
-win32:exists($$MCPLAYER_SOURCE_TREE/lib/mcplayer) {
-    # for .lib in case of binary package with dev package
-    LIBS *= -L$$MCPLAYER_SOURCE_TREE/lib/mcplayer
-    LIBS *= -L$$MCPLAYER_SOURCE_TREE/lib/mcplayer/plugins
-}
-
 INCLUDEPATH += $$MCPLAYER_SOURCE_TREE/src
 LIBS *= -L$$MCPLAYER_LIBRARY_PATH
 
