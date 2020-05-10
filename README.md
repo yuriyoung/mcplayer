@@ -70,7 +70,11 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
 - Linux:
   > TODO
 
-> :warning: NOTE: Read the code ( `QmlWindow.h` and `QmlWindow.cpp` ) and do something yourself before build. :grin::grin::grin:
+> ~~:warning: NOTE: Read the code ( `QmlWindow.h` and `QmlWindow.cpp` ) and do something yourself before build. ~~:grin::grin::grin:
+
+# How to
+- **How to add media file?**
+  Drag and Drop Media files to the main window. click the `play` button.
 
 ## 
 > Copyright &copy; Yuri Young yuri.young@qq.ocm
