@@ -144,6 +144,11 @@ void VLCMetadataControlPrivate::updateMetaData()
         const QString key = vlcMetaDataKeys()->value(id, QString::number(id));
         metadata.insert(key, meta(vlcMedia, id));
     }
+
+    if(!metadata.value(Metadata::Title).toBool())
+    {
+        metadata[Metadata::Title] = libvlc_media_get_mrl(vlcMedia);
+    }
 }
 
 
@@ -189,8 +194,7 @@ void VLCMetadataControlPrivate::processEvents(const libvlc_event_t *event, void 
         libvlc_meta_t id = event->u.media_meta_changed.meta_type;
         QString key = vlcMetaDataKeys()->value(id, QString::number(id));
         QVariant value = d->meta(d->vlcMedia, event->u.media_meta_changed.meta_type);
-        qInfo() << key << value;
-        if(!value.isNull())
+        if(value.toBool())
         {
             d->metadata.insert(key, value);
             emit d->q_func()->metadataChanged(key, value);
