@@ -3,6 +3,7 @@
 #include "VLCMetadataControl.h"
 
 #include <vlc/vlc.h>
+#include <QCoreApplication>
 #include <QLoggingCategory>
 
 Q_LOGGING_CATEGORY(lcVLCEngine, "mcplayer.VLCEngine")
@@ -20,7 +21,6 @@ public:
     libvlc_instance_t* createVLCInstance()
     {
         QVector<const char*> opts;
-        QByteArray networkCachingBuf;
 
         opts.push_back( "--ignore-config" );
         opts.push_back( "--no-video" ); // just audio for current version
@@ -35,6 +35,16 @@ public:
 //        opts.push_back( "--no-video-title-show" );
 //        opts.push_back( "--ffmpeg-hw" );
 //        opts.push_back( "--avcodec-hw=any" );
+
+        /*!
+         * place the libvlc "plugins" folder same dir with the application
+         * MacOS: McPlayer.app/Contents/MacOS/plugins
+         * or
+         * MacOS: McPlayer.app/Contents/Frameworks/vlc/plugins ?
+         *
+         */
+        QByteArray pluginPath = qApp->applicationDirPath().append("/plugins").toUtf8();
+        qputenv("VLC_PLUGIN_PATH", pluginPath);
 
         vlcIinstance = libvlc_new(opts.size(), opts.data());
         return vlcIinstance;
