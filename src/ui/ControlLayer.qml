@@ -2,7 +2,7 @@ import QtQuick 2.12
 import QtQuick.Layouts 1.12
 import QtQuick.Controls 2.12
 
-import McPlayer 1.0
+import org.mcplayer 1.0
 import "qrc:///styles/"
 import "qrc:///components/" as COM
 import "qrc:///player/" as PLAYER
@@ -22,14 +22,9 @@ Item {
         width: playbackProgress.width
         elide: Text.ElideRight
         text: {
-            var result = "Unknown Title"; // todo: show the media file name ?
-            if(mediaMetaData) {
-                if(mediaMetaData.title)
-                    result = mediaMetaData.title
-                if(mediaMetaData.author)
-                    result += " - " + mediaMetaData.author
-            }
-
+            var result = mediaPlayer.metadata.Title || ""
+            if(mediaPlayer.metadata.author)
+                result += " - " + mediaPlayer.metadata.Author
             return result;
         }
     }
@@ -52,7 +47,7 @@ Item {
         Label {
             id: durationLable
             Layout.alignment: Qt.AlignRight |  Qt.AlignTop
-            text: mediaPlayer.duration.toString()
+            text: mediaPlayer.metadata.Duration || mediaPlayer.duration.toString()
             font.pixelSize: 10
         }
     }
@@ -62,15 +57,39 @@ Item {
 
         anchors.bottom: parent.bottom
         anchors.bottomMargin: control.bottomMargin + 12
+        value: mediaPlayer.position
+        onPressedChanged: {
+            if (mediaPlayer.playbackState !== MediaPlayer.StoppedState) {
+                if (pressed) {
+                    mediaPlayer.pause()
+                } else {
+                    mediaPlayer.seek(value)
+                    mediaPlayer.resume()
+                }
+            }
+        }
+//    onMoved: {
+//        if(mediaPlayer.playbackState !== MediaPlayer.StoppedState)
+//            mediaPlayer.seek(valueAt(position))
+//    }
     }
 
     PLAYER.PlayControl {
         id: playButton
 
+        x: parent.width - 140
         anchors.bottom: parent.bottom
         anchors.bottomMargin: control.bottomMargin
-        x: parent.width - 140
+        icon.name: mediaPlayer.playbackState === MediaPlayer.PlayingState
+                   ? AppIcons.mdi_pause
+                   : AppIcons.mdi_play
+        onClicked: {
+            mediaPlayer.playbackState === MediaPlayer.PlayingState
+                    ? mediaPlayer.pause()
+                    : mediaPlayer.play();
+        }
     }
+
     COM.RoundButton {
         id: previousButton
 
@@ -79,8 +98,13 @@ Item {
         icon.name: AppIcons.mdi_skip_previous
         size: AppStyle.sm
         textColor: "white"
-        onClicked: mediaPlayer.previous()
+        onClicked: {
+            mediaPlayer.previous()
+            if(mediaPlayer.playbackState !== MediaPlayer.PlayingState)
+                mediaPlayer.play()
+        }
     }
+
     COM.RoundButton {
         id: nextButton
 
@@ -89,9 +113,16 @@ Item {
         icon.name: AppIcons.mdi_skip_next
         size: AppStyle.sm
         textColor: "white"
-        onClicked: mediaPlayer.next()
+        onClicked: {
+            mediaPlayer.next()
+            if(mediaPlayer.playbackState !== MediaPlayer.PlayingState)
+                mediaPlayer.play()
+        }
     }
+
     PLAYER.VolumeControl {
+        id: volumeButton
+
         anchors.left: nextButton.right
         y: nextButton.y + nextButton.height / 2 - nextButton.height / 2
     }

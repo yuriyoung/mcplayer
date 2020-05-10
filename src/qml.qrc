@@ -1,5 +1,5 @@
 <RCC>
-	<qresource prefix="/">
+    <qresource prefix="/">
         <file>qtquickcontrols2.conf</file>
     </qresource>
     <qresource prefix="/assets">
@@ -10,6 +10,7 @@
         <file alias="main.qml">ui/main.qml</file>
         <file alias="BackgroundLayer.qml">ui/BackgroundLayer.qml</file>
         <file alias="ControlLayer.qml">ui/ControlLayer.qml</file>
+        <file alias="DataLayer.qml">ui/DataLayer.qml</file>
     </qresource>
     <qresource prefix="/styles">
         <file alias="AppIcons.qml">ui/styles/AppIcons.qml</file>

@@ -23,7 +23,6 @@ COM.RoundButton {
         volumeSlider.value = vol
     }
 
-
     Popup {
         id: volumePopup
 

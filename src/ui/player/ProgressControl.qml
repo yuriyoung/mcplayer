@@ -1,7 +1,6 @@
 import QtQuick 2.12
 import QtQuick.Controls 2.12
 
-import McPlayer 1.0
 import "qrc:///styles/"
 
 Slider {
@@ -12,22 +11,6 @@ Slider {
     horizontalPadding: 0
     from: 0.0
     to: 1.0
-    value: mediaPlayer.position
-    onPressedChanged: {
-        if (mediaPlayer.playbackState !== MediaPlayer.StoppedState) {
-            if (pressed) {
-                mediaPlayer.pause()
-            } else {
-                mediaPlayer.seek(value)
-                mediaPlayer.resume()
-            }
-        }
-    }
-
-//    onMoved: {
-//        if(mediaPlayer.playbackState !== MediaPlayer.StoppedState)
-//            mediaPlayer.seek(valueAt(position))
-//    }
 
     states: [
         State {
