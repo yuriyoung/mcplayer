@@ -63,6 +63,7 @@ void QmlWindow::qmlRegisterType()
 
     // create a playlist
     m_playlistModel = d->lazyPlaylistModel.get();
+    m_playlistModel->playlist()->setPlaybackMode(MediaPlaylist::Loop);
     m_playlistModel->add({
         QUrl(QStringLiteral("file:///E:/Users/Yuri/Music/Dearest.flac")),
         QUrl(QStringLiteral("file:///E:/Users/Yuri/Music/hui_yi_de_sha_lou.wav")),
