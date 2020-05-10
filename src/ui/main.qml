@@ -9,7 +9,7 @@ Window {
 
     visible: true
     width: 640
-    height: 480
+    height: 360
     minimumWidth: 160
     minimumHeight: 200
     title: qsTr("McPlayer 0.0.1-dev")
