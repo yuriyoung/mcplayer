@@ -1,7 +1,7 @@
 #include "VLCPlayerControl.h"
 #include "VLCMetadataControl.h"
 
-#include <vlc.h>
+#include <vlc/vlc.h>
 #include <QDir>
 #include <QFile>
 #include <QLoggingCategory>

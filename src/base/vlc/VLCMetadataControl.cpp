@@ -2,7 +2,7 @@
 #include "VLCPlayerControl.h"
 #include "Metadata.h"
 
-#include <vlc.h>
+#include <vlc/vlc.h>
 #include <QLoggingCategory>
 
 Q_LOGGING_CATEGORY(lcVLCMetadataControl, "mcplayer.VLCMetadataControl")
