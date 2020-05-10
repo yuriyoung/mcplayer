@@ -8,10 +8,13 @@
 #include <QQmlParserStatus>
 #include <QtQml>
 
+class QmlMediaPlaylist;
 class QmlMediaMetadata;
+
 class QmlMediaPlayer : public QObject, public QQmlParserStatus
 {
     Q_OBJECT
+    Q_DISABLE_COPY(QmlMediaPlayer)
     Q_INTERFACES(QQmlParserStatus)
     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(PlaybackState playbackState READ playbackState NOTIFY playbackStateChanged)
@@ -31,7 +34,7 @@ class QmlMediaPlayer : public QObject, public QQmlParserStatus
     Q_PROPERTY(qreal rate READ rate WRITE setRate NOTIFY rateChanged)
     Q_PROPERTY(Error error READ error NOTIFY errorChanged)
     Q_PROPERTY(QString errorString READ errorString NOTIFY errorChanged)
-    Q_PROPERTY(MediaPlaylist *playlist READ playlist WRITE setPlaylist NOTIFY playlistChanged)
+    Q_PROPERTY(QmlMediaPlaylist *playlist READ playlist WRITE setPlaylist NOTIFY playlistChanged)
     Q_PROPERTY(QmlMediaMetadata *metadata READ metadata CONSTANT)
     Q_ENUMS(PlaybackState MediaStatus Error)
 public:
@@ -83,16 +86,16 @@ public:
     QUrl source() const;
     void setSource(const QUrl &url);
 
-    // TODO: imple a QmlPlaylist class:
+    // QmlPlaylist in QML:
     //! MediaPlayer {
     //!     playlist: Playlist {
-    //!         Media { source: "FILENAME1" }
-    //!         Media { source: "FILENAME2" }
-    //!         Media { source: "FILENAME3" }
+    //!         MediaItem { source: "FILENAME1" }
+    //!         MediaItem { source: "FILENAME2" }
+    //!         MediaItem { source: "FILENAME3" }
     //!     }
-    //! {
-    MediaPlaylist *playlist() const;
-    void setPlaylist(MediaPlaylist *playlist);
+    //! }
+    QmlMediaPlaylist *playlist() const;
+    void setPlaylist(QmlMediaPlaylist *playlist);
 
     PlaybackState playbackState() const;
     void setPlaybackState(MediaPlayer::PlaybackState playbackState);
@@ -187,6 +190,7 @@ private:
     int m_runningCount = 0;
     bool m_playlistMediaChanged = false;
 
+    QmlMediaPlaylist *m_playlist = nullptr;
     MediaPlayer *m_player = nullptr;
     QUrl m_source;
     Media m_media;

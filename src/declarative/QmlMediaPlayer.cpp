@@ -1,5 +1,6 @@
 #include "QmlMediaPlayer.h"
 #include "QmlMediaMetadata.h"
+#include "QmlMediaPlaylist.h"
 
 #include <QQmlInfo>
 #include <QTime>
@@ -119,14 +120,14 @@ QUrl QmlMediaPlayer::source() const
 
 void QmlMediaPlayer::setSource(const QUrl &url)
 {
-//    if (url == m_source && m_playlist == nullptr)
-//        return;
+    if (url == m_source && m_playlist == nullptr)
+        return;
 
-//    if (m_playlist)
-//    {
-//        m_playlist = nullptr;
-//        emit playlistChanged();
-//    }
+    if (m_playlist)
+    {
+        m_playlist = nullptr;
+        emit playlistChanged();
+    }
 
     m_source = url;
     m_media = m_source.isEmpty() ? Media() : m_source;
@@ -152,14 +153,24 @@ void QmlMediaPlayer::setSource(const QUrl &url)
         m_player->play();
 }
 
-MediaPlaylist *QmlMediaPlayer::playlist() const
+QmlMediaPlaylist *QmlMediaPlayer::playlist() const
 {        
-    return m_player->playlist();
+    return m_playlist;
 }
 
-void QmlMediaPlayer::setPlaylist(MediaPlaylist *playlist)
+void QmlMediaPlayer::setPlaylist(QmlMediaPlaylist *playlist)
 {
-    m_media = playlist ? Media(playlist, QUrl(), false) : Media();
+    if (playlist == m_playlist && m_source.isEmpty())
+        return;
+
+    if (!m_source.isEmpty())
+    {
+        m_source.clear();
+        emit sourceChanged();
+    }
+
+    m_playlist = playlist;
+    m_media = m_playlist ? Media(m_playlist->mediaPlaylist(), QUrl(), false) : Media();
     m_loaded = false;
     if (m_componentCompleted && (m_autoLoad || m_media.isNull() || m_autoPlay))
     {
