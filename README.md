@@ -28,7 +28,7 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
 
 # ScreenShots
 
-![shot](./screenshots/simple_play_0.jpg)
+![shot](./screenshots/simple_play_0.1.jpg)
 
 # Requirements
 - Qt 5.12.0 or later
