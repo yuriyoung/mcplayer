@@ -3,8 +3,6 @@ INCLUDEPATH += base
 HEADERS += \
     $$PWD/Metadata.h \
     $$PWD/RuntimeError.h \
-    $$PWD/database/Database.h \
-    $$PWD/database/DatabaseError.h \
     $$PWD/global.h \
     $$PWD/library/MediaDiscoverer.h \
     $$PWD/library/MediaLibrary.h \
@@ -36,8 +34,6 @@ HEADERS += \
 SOURCES += \
     $$PWD/Metadata.cpp \
     $$PWD/RuntimeError.cpp \
-    $$PWD/database/Database.cpp \
-    $$PWD/database/DatabaseError.cpp \
     $$PWD/library/MediaDiscoverer.cpp \
     $$PWD/library/MediaLibrary.cpp \
     $$PWD/player/LocalMediaPlaylistControl.cpp \
