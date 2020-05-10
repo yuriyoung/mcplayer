@@ -1,4 +1,6 @@
 #include "Application.h"
+#include "player/MediaPlayer.h"
+#include "utils/Lazy.h"
 
 #ifndef DISABLE_GUI
 #include "QmlWindow.h"
@@ -8,6 +10,7 @@
 #include <QTranslator>
 #include <QPointer>
 #include <QTimer>
+#include <QDebug>
 
 class ApplicationPrivate
 {
@@ -20,10 +23,12 @@ public:
 #endif
 
     QTranslator translator;
+    Util::Lazy<MediaPlayer> miniPlayer;
 };
 
 ApplicationPrivate::ApplicationPrivate(Application *app)
     : q_ptr(app)
+    , miniPlayer([=]{ return new MediaPlayer(app); })
 {
 
 }
@@ -72,13 +77,17 @@ Application::~Application()
     qDebug() << "Application::~Application()";
 }
 
+MediaPlayer *Application::player() const
+{
+    return d->miniPlayer.get();
+}
+
 int Application::exec(const QStringList &params)
 {
     Q_UNUSED(params)
 
 #ifndef DISABLE_GUI
     d->qmlWindow = new QmlWindow(this);
-    d->qmlWindow->qmlRegisterType();
     d->qmlWindow->show();
 #endif
 

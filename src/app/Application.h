@@ -1,10 +1,7 @@
 #ifndef APPLICATION_H
 #define APPLICATION_H
 
-#include <QRunnable>
-#include <QThread>
-#include <QThreadPool>
-#include <QDebug>
+#include "global.h"
 
 #ifndef DISABLE_GUI
 #include <QGuiApplication>
@@ -14,9 +11,9 @@ using BaseApplication = QGuiApplication;
 using BaseApplication = QCoreApplication;
 #endif
 
-#include "global.h"
+#define app() (Application::instance())
 
-#define core() (Application::instance())
+class MediaPlayer;
 
 class ApplicationPrivate;
 class Application : public BaseApplication
@@ -28,11 +25,14 @@ public:
     explicit Application(int &argc, char **argv);
     ~Application();
 
+    MediaPlayer *player() const;
+
     int exec(const QStringList &params = {});
 
 signals:
 
 public slots:
+
 };
 
 #endif // APPLICATION_H

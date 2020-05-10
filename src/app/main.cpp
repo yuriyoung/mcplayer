@@ -7,9 +7,9 @@ int main(int argc, char *argv[])
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 #endif
 
-    Application app(argc, argv);
+    Application a(argc, argv);
 	
 	//TODO: initialize configure or something
 
-    return app.exec();
+    return a.exec();
 }
