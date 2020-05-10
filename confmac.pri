@@ -27,4 +27,4 @@ INSTALL_BIN_PATH     = $$APP_PREFIX/$${APP_TARGET}.app/Contents/MacOS
 INSTALL_APP_PATH     = $$APP_PREFIX/
 
 LIBS *= -L$$MCPLAYER_LIBRARY_PATH \
-        -L$$MCPLAYER_SOURCE_TREE/3rdparty/vlc/lib -lvlc -lvlccore
+    -L$$MCPLAYER_SOURCE_TREE/3rdparty/vlc/lib -lvlc -lvlccore

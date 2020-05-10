@@ -33,5 +33,6 @@ DEFINES += RC_VERSION=$$replace(MCPLAYER_VERSION, "\\.", ","),0 \
         RC_COPYRIGHT=\"$$replace(COPYRIGHT, " ", "\\x20")\"
 RC_FILE = mcplayer.rc
 
+# can not read vlc.lib file in windows
 LIBS *= -L$$MCPLAYER_LIBRARY_PATH \
-        -L$$MCPLAYER_SOURCE_TREE/3rdparty/vlc/lib -llibvlc -llibvlccore
+    -L$$MCPLAYER_SOURCE_TREE/3rdparty/vlc/lib -llibvlc -llibvlccore
