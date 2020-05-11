@@ -69,13 +69,13 @@ libvlc_media_t *VLCPlayerControlPrivate::toVlcMedia(const Media &media, int *fla
         {
             *flag = libvlc_media_parse_local;
             QString path = QDir::toNativeSeparators(media.canonicalUrl().toLocalFile());
-            vlc_media = libvlc_media_new_path(engine->vlcInstance(), path.toUtf8().data());
+            vlc_media = libvlc_media_new_path(engine->vlcInstance(), path.toUtf8().constData());
         }
         else
         {
             *flag = libvlc_media_parse_network;
-            QString urlString = media.canonicalUrl().toString();
-            vlc_media = libvlc_media_new_location(engine->vlcInstance(), urlString.toUtf8().data());
+            QByteArray path = media.canonicalUrl().toEncoded();
+            vlc_media = libvlc_media_new_location(engine->vlcInstance(), path.constData());
         }
     }
     else
@@ -114,127 +114,128 @@ void VLCPlayerControlPrivate::processEvents(const libvlc_event_t *event, void *d
     case libvlc_MediaPlayerMediaChanged:
         emit player->mediaChanged(player->d_func()->currentMedia);
         qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerMediaChanged: "
-                                    << player->d_func()->currentMedia.canonicalUrl();
+                                    << d->currentMedia.canonicalUrl();
         break;
     case libvlc_MediaPlayerNothingSpecial:
-            player->d_func()->setMediaStatus(MediaPlayer::NoMedia);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerNothingSpecial: ";
-            break;
-        case libvlc_MediaPlayerOpening:
-            player->d_func()->setMediaStatus(MediaPlayer::LoadingMedia);
-            emit player->opening();
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerOpening: ";
-            break;
-        case libvlc_MediaPlayerBuffering:
-            player->d_func()->setMediaStatus(MediaPlayer::BufferingMedia);
-            player->d_func()->bufferLevel = qRound(event->u.media_player_buffering.new_cache);
-            emit player->buffering(event->u.media_player_buffering.new_cache);
-            emit player->bufferStatusChanged(qRound(event->u.media_player_buffering.new_cache));
-            break;
-        case libvlc_MediaPlayerPlaying:
-            emit player->stateChanged(MediaPlayer::PlayingState);
-            emit player->playing();
-//            player->d_func()->setMediaStatus(MediaPlayer::NowPlayingMedia);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerPlaying: ";
-            break;
-        case libvlc_MediaPlayerPaused:
-            player->stateChanged(MediaPlayer::PausedState);
-            emit player->paused();
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerPaused: ";
-            break;
-        case libvlc_MediaPlayerStopped:
-            player->stateChanged(MediaPlayer::StoppedState);
-            emit player->stopped();
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerStopped: ";
-            break;
-        case libvlc_MediaPlayerForward:
-            emit player->forward();
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerForward: ";
-            break;
-        case libvlc_MediaPlayerBackward:
-            emit player->backward();
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerBackward: ";
-            break;
-        case libvlc_MediaPlayerEndReached:
-            player->d_func()->setMediaStatus(MediaPlayer::EndOfMedia);
-            emit player->end();
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerEndReached: ";
-            break;
-        case libvlc_MediaPlayerEncounteredError:
-            emit player->error(MediaPlayer::ResourceError, player->d_func()->debugError());
-            player->d_func()->setMediaStatus(MediaPlayer::InvalidMedia);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerEncounteredError: ";
-            player->d_func()->debugError();
-            break;
-        case libvlc_MediaPlayerTimeChanged:
-            emit player->timeChanged(event->u.media_player_time_changed.new_time);
-    //        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerTimeChanged: " << event->u.media_player_time_changed.new_time;
+        d->setMediaStatus(MediaPlayer::NoMedia);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerNothingSpecial: ";
+        break;
+    case libvlc_MediaPlayerOpening:
+        d->setMediaStatus(MediaPlayer::LoadingMedia);
+        emit player->opening();
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerOpening: ";
+        break;
+    case libvlc_MediaPlayerBuffering:
+        d->setMediaStatus(MediaPlayer::BufferingMedia);
+        d->bufferLevel = qRound(event->u.media_player_buffering.new_cache);
+        emit player->buffering(event->u.media_player_buffering.new_cache);
+        emit player->bufferStatusChanged(qRound(event->u.media_player_buffering.new_cache));
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerBuffering: ";
+        break;
+    case libvlc_MediaPlayerPlaying:
+        emit player->stateChanged(MediaPlayer::PlayingState);
+        emit player->playing();
+//        d->setMediaStatus(MediaPlayer::NowPlayingMedia);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerPlaying: ";
+        break;
+    case libvlc_MediaPlayerPaused:
+        emit player->stateChanged(MediaPlayer::PausedState);
+        emit player->paused();
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerPaused: ";
+        break;
+    case libvlc_MediaPlayerStopped:
+        emit player->stateChanged(MediaPlayer::StoppedState);
+        emit player->stopped();
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerStopped: ";
+        break;
+    case libvlc_MediaPlayerForward:
+        emit player->forward();
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerForward: ";
+        break;
+    case libvlc_MediaPlayerBackward:
+        emit player->backward();
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerBackward: ";
+        break;
+    case libvlc_MediaPlayerEndReached:
+        d->setMediaStatus(MediaPlayer::EndOfMedia);
+        emit player->end();
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerEndReached: ";
+        break;
+    case libvlc_MediaPlayerEncounteredError:
+        emit player->error(MediaPlayer::ResourceError, player->d_func()->debugError());
+        d->setMediaStatus(MediaPlayer::InvalidMedia);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerEncounteredError: ";
+        d->debugError();
+        break;
+    case libvlc_MediaPlayerTimeChanged:
+        emit player->timeChanged(event->u.media_player_time_changed.new_time);
+//        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerTimeChanged: " << event->u.media_player_time_changed.new_time;
 //            libvlc_media_get_stats(d->vlcMedia, d->stats);
-    //        qDebug() << player->d_func()->stats->i_read_bytes
-    //            << player->d_func()->stats->f_input_bitrate
-    //            << player->d_func()->stats->i_demux_read_bytes
-    //            << player->d_func()->stats->f_demux_bitrate
-    //            << player->d_func()->stats->i_demux_corrupted
-    //            << player->d_func()->stats->i_demux_discontinuity
-    //            << player->d_func()->stats->i_decoded_audio
-    //            << player->d_func()->stats->i_played_abuffers
-    //            << player->d_func()->stats->i_lost_abuffers;
-            break;
-        case libvlc_MediaPlayerPositionChanged:
-            emit player->positionChanged(static_cast<double>(event->u.media_player_position_changed.new_position));
-    //        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerPositionChanged: "
-    //                                    << event->u.media_player_position_changed.new_position;
-            break;
-        case libvlc_MediaPlayerSeekableChanged:
-            emit player->seekableChanged(event->u.media_player_seekable_changed.new_seekable);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerSeekableChanged: "
-                                        << event->u.media_player_seekable_changed.new_seekable;
-            break;
-        case libvlc_MediaPlayerPausableChanged:
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerPausableChanged: "
-                                        << event->u.media_player_pausable_changed.new_pausable;
-            break;
-        case libvlc_MediaPlayerTitleChanged:
-            emit player->titleChanged(event->u.media_player_title_changed.new_title);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerTitleChanged: "
-                                        << event->u.media_player_title_changed.new_title;
-            break;
-        case libvlc_MediaPlayerSnapshotTaken:
-            emit player->snapshotTaken(event->u.media_player_snapshot_taken.psz_filename);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerSnapshotTaken: ";
-            break;
-        case libvlc_MediaPlayerLengthChanged:
-            emit player->durationChanged(event->u.media_player_length_changed.new_length);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerLengthChanged: "
-                                        << event->u.media_player_length_changed.new_length;
-            break;
-        case libvlc_MediaPlayerVout:
-            emit player->voutChanged(event->u.media_player_vout.new_count);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerVout: "
-                                        << event->u.media_player_vout.new_count;
-            break;
-        case libvlc_MediaPlayerMuted:
-            emit player->mutedChanged(true);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerMuted: ";
-            break;
-        case libvlc_MediaPlayerUnmuted:
-            emit player->mutedChanged(false);
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerUnmuted: ";
-            break;
-        case libvlc_MediaPlayerAudioVolume:
-    //        emit player->volumeChanged(qRound(event->u.media_player_audio_volume.volume * 100));
-    //        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerAudioVolume: "
-    //                                    << event->u.media_player_audio_volume.volume;
-            break;
-        case libvlc_MediaPlayerAudioDevice:
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerAudioDevice: "
-                                        << event->u.media_player_audio_device.device;
-            break;
-        case libvlc_MediaPlayerChapterChanged:
-            qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerChapterChanged: ";
-            break;
-        default:
-            break;
+//        qDebug() << player->d_func()->stats->i_read_bytes
+//            << player->d_func()->stats->f_input_bitrate
+//            << player->d_func()->stats->i_demux_read_bytes
+//            << player->d_func()->stats->f_demux_bitrate
+//            << player->d_func()->stats->i_demux_corrupted
+//            << player->d_func()->stats->i_demux_discontinuity
+//            << player->d_func()->stats->i_decoded_audio
+//            << player->d_func()->stats->i_played_abuffers
+//            << player->d_func()->stats->i_lost_abuffers;
+        break;
+    case libvlc_MediaPlayerPositionChanged:
+        emit player->positionChanged(static_cast<double>(event->u.media_player_position_changed.new_position));
+//        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerPositionChanged: "
+//                                    << event->u.media_player_position_changed.new_position;
+        break;
+    case libvlc_MediaPlayerSeekableChanged:
+        emit player->seekableChanged(event->u.media_player_seekable_changed.new_seekable);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerSeekableChanged: "
+                                    << event->u.media_player_seekable_changed.new_seekable;
+        break;
+    case libvlc_MediaPlayerPausableChanged:
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerPausableChanged: "
+                                    << event->u.media_player_pausable_changed.new_pausable;
+        break;
+    case libvlc_MediaPlayerTitleChanged:
+        emit player->titleChanged(event->u.media_player_title_changed.new_title);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerTitleChanged: "
+                                    << event->u.media_player_title_changed.new_title;
+        break;
+    case libvlc_MediaPlayerSnapshotTaken:
+        emit player->snapshotTaken(event->u.media_player_snapshot_taken.psz_filename);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerSnapshotTaken: ";
+        break;
+    case libvlc_MediaPlayerLengthChanged:
+        emit player->durationChanged(event->u.media_player_length_changed.new_length);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerLengthChanged: "
+                                    << event->u.media_player_length_changed.new_length;
+        break;
+    case libvlc_MediaPlayerVout:
+        emit player->voutChanged(event->u.media_player_vout.new_count);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerVout: "
+                                    << event->u.media_player_vout.new_count;
+        break;
+    case libvlc_MediaPlayerMuted:
+        emit player->mutedChanged(true);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerMuted: ";
+        break;
+    case libvlc_MediaPlayerUnmuted:
+        emit player->mutedChanged(false);
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerUnmuted: ";
+        break;
+    case libvlc_MediaPlayerAudioVolume:
+//        emit player->volumeChanged(qRound(event->u.media_player_audio_volume.volume * 100));
+//        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerAudioVolume: "
+//                                    << event->u.media_player_audio_volume.volume;
+        break;
+    case libvlc_MediaPlayerAudioDevice:
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerAudioDevice: "
+                                    << event->u.media_player_audio_device.device;
+        break;
+    case libvlc_MediaPlayerChapterChanged:
+        qInfo(lcVLCPlayerControl()) << "libvlc_MediaPlayerChapterChanged: ";
+        break;
+    default:
+        break;
     }
 }
 
@@ -414,7 +415,7 @@ void VLCPlayerControl::setMedia(const Media &media, QIODevice *stream)
 
     if(!d->currentVLCMedia)
     {
-        emit mediaStatusChanged(MediaPlayer::NoMedia);
+        d->setMediaStatus(MediaPlayer::NoMedia);
         return;
     }
 

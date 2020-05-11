@@ -206,7 +206,7 @@ void VLCMetadataControlPrivate::processEvents(const libvlc_event_t *event, void 
          emit d->engine->playerControl()->durationChanged(libvlc_media_get_duration(d->vlcMedia));
         break;
     case libvlc_MediaStateChanged:
-        qDebug(lcVLCMetadataControl) << "libvlc_MediaStateChanged";
+//        qDebug(lcVLCMetadataControl) << "libvlc_MediaStateChanged";
         break;
     case libvlc_MediaFreed:
         qDebug(lcVLCMetadataControl) << "libvlc_MediaFreed";
