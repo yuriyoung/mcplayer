@@ -23,7 +23,7 @@ Item {
         elide: Text.ElideRight
         text: {
             var result = mediaPlayer.metadata.Title || ""
-            if(mediaPlayer.metadata.author)
+            if(mediaPlayer.metadata.Author)
                 result += " - " + mediaPlayer.metadata.Author
             return result;
         }
