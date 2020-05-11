@@ -53,13 +53,8 @@ Window {
         playlist: MediaPlaylist {
             id: playlist
 
-            currentIndex: 0
+            currentIndex: itemCount > 0 ? 0 : -1
             playbackMode: MediaPlaylist.Loop
-
-            MediaItem { source: "file:///E:/Users/Yuri/Music/浜崎あゆみ(滨崎步)-Dearest.flac" }
-            MediaItem { source: "file:///E:/Users/Yuri/Music/蔡琴-被遗忘的时光.wav" }
-            MediaItem { source: "file:///E:/Users/Yuri/Music/邓紫棋-回忆的沙漏.wav" }
-            MediaItem { source: "file:///E:/Users/Yuri/Music/小岩井ことり - ピカピカなのん.mp3" }
         }
     }
 
