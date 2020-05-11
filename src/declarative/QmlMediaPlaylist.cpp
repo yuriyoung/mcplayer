@@ -51,7 +51,6 @@ void QmlMediaPlaylist::classBegin()
     connect(m_playlist.data(), &MediaPlaylist::mediaAboutToRemoved, this, &QmlMediaPlaylist::beginRemoveItems);
     connect(m_playlist.data(), &MediaPlaylist::mediaRemoved, this, &QmlMediaPlaylist::endRemoveItems);
     connect(m_playlist.data(), &MediaPlaylist::mediaChanged, this, &QmlMediaPlaylist::changeItems);
-    connect(m_playlist.data(), &MediaPlaylist::mediaChanged, this, &QmlMediaPlaylist::changeItems);
     connect(m_playlist.data(), &MediaPlaylist::loadFailed, this, &QmlMediaPlaylist::playlistLoadFailed);
 
     if(m_playlist->isReadOnly())

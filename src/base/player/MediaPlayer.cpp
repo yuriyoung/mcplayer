@@ -310,6 +310,7 @@ void MediaPlayerPrivate::updatePlaybackState(MediaPlayer::PlaybackState state)
     qDebug(lcMediaPlayer) << "state changed"
                           << playbackState
                           << "to"<< state;
+//    sender()->dumpObjectInfo();
 
     if (playlist && playlist->currentIndex() != -1
             && state != playbackState
@@ -319,6 +320,7 @@ void MediaPlayerPrivate::updatePlaybackState(MediaPlayer::PlaybackState state)
                 || control->mediaStatus() == MediaPlayer::InvalidMedia)
         {
             Q_ASSERT(playbackState != MediaPlayer::StoppedState);
+            qDebug() << "============================" << playbackState << state;
             playlist->next();
             return;
         }
@@ -442,8 +444,6 @@ void MediaPlayerPrivate::updateMedia(const Media &media)
             break;
         }
     }
-
-    this->updatePlaybackState(control->playbackState());
 }
 
 void MediaPlayerPrivate::updatePlaylist()
@@ -810,7 +810,7 @@ void MediaPlayer::play()
     Q_D(MediaPlayer);
     if(!d->control)
     {
-        qDebug() << "The MediaPlayer object does not have a valid engine";
+        qDebug(lcMediaPlayer) << "The MediaPlayer object does not have a valid engine";
         QMetaObject::invokeMethod(d, "updateError", Qt::QueuedConnection,
                                   Q_ARG(int, MediaPlayer::EngineMissingError),
                                   Q_ARG(QString, tr("The MediaPlayer object does not have a valid engine")));
