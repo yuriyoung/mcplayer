@@ -78,4 +78,8 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
 ## 
 > Copyright &copy; Yuri Young yuri.young@qq.ocm
 
+<details>
+<summary>:small_red_triangle_down: :small_red_triangle_down: :small_red_triangle_down:</summary>
 <img src="https://github.com/yuriyoung/resources/blob/master/weixin-pay.jpg" width="200">
+</details>
+
