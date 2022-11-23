@@ -36,7 +36,8 @@ a music playback player build on Qt 5 & Qt Quick 2.x & libvlc
 - Libvlc 3.0 or later
 
 # Build
-- Download libvlc library (http://ftp.gnome.org/mirror/videolan.org/vlc/last/)
+- Download libvlc library (http://ftp.gnome.org/mirror/videolan.org/vlc/last/) Invalid
+- Download libvlc library ([http://ftp.gnome.org/mirror/videolan.org/vlc/last/](https://download.videolan.org/pub/videolan/vlc/last/))
 
 - Windows:
   - unzip if you download zip package, install if you download the execute package.
