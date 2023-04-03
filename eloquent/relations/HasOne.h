@@ -2,8 +2,6 @@
 #define HASONE_H
 
 #include "HasOneOrMany.h"
-#include "../Model.h"
-
 class HasOne : public HasOneOrMany
 {
 public:
