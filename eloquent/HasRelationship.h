@@ -1,7 +1,7 @@
 #ifndef HASRELATIONSHIP_H
 #define HASRELATIONSHIP_H
 
-#include "Model.h"
+
 #include "relations/Relation.h"
 #include "relations/HasOne.h"
 #include "relations/HasMany.h"
@@ -11,7 +11,7 @@
 
 #include <QObject>
 #include <QSharedPointer>
-
+class Model;
 class Connection;
 class Relation;
 
