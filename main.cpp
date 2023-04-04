@@ -1,8 +1,8 @@
-//#include "schema/Blueprint.h"
-//#include "schema/SQLiteSchemaGrammar.h"
-//#include "Connection.h"
-//#include "SQLiteConnection.h"
-//#include "ConnectionProvider.h"
+#include "schema/Blueprint.h"
+#include "schema/SQLiteSchemaGrammar.h"
+#include "Connection.h"
+#include "SQLiteConnection.h"
+#include "ConnectionProvider.h"
 #include "Database.h"
 #include "query/QueryBuilder.h"
 #include "query/QueryGrammar.h"
@@ -68,8 +68,8 @@ int main(int argc, char *argv[])
     qDebug() << "Return type: " << metaMethod.returnType();
     qDebug() << "Type name: " << metaMethod.typeName();
 */
-
 /*
+
     SQLiteSchemaGrammar grammar;
     Blueprint blueprint("users", [](Blueprint *blueprint){
         blueprint->increments("id").comment("primary key");
@@ -81,12 +81,14 @@ int main(int argc, char *argv[])
         blueprint->timestamps();
         blueprint->softDeletes();
 
-        blueprint->foreign({"post_id"}).references("id").on("posts").onDelete("cascade").onUpdate("cascade");
+//        blueprint->foreign({"post_id"}).references("id").on("posts").onDelete("cascade").onUpdate("cascade");
     });
 
     blueprint.create();
     blueprint.build(nullptr, &grammar);
 */
+
+
 /*
     {
         DatabaseManager::schema()->dropIfExists("users");
