@@ -315,8 +315,10 @@ void Blueprint::build(const Connection *connection, const Grammar *grammar)
     Q_D(Blueprint);
     d->connection = const_cast<Connection *>(connection);
     d->grammar = const_cast<Grammar *>(grammar);
+//    qDebug()<<"YYD"<< this->toSql();
     foreach(auto sql, this->toSql())
     {
+        qDebug().noquote()<<sql;
         if(sql.isEmpty())
             continue;
 

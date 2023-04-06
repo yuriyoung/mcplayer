@@ -67,7 +67,7 @@ public:
     ~Database();
 
     static Database *instance();
-    static QueryBuilder table(const QString &table, const QString &as = "", const QString &connection = "");
+    static QueryBuilder table(const QString &connection = "");
     static SchemaBuilder schema(const QString &connection = "");
 
     // get a datanase connection by specified config name, not a connection name
