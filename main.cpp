@@ -115,6 +115,7 @@ int main(int argc, char *argv[])
 
 //    QDateTime now = QDateTime::currentDateTime();
 //    qDebug() << now.toString("yyyy-MM-dd HH:mm:ss");
+    //Create Table
     Connection *connection = Database::instance()->connection();
     QSharedPointer<Grammar> grammar = connection->schemaGrammar();
     Blueprint blueprint("users", [](Blueprint *blueprint){
@@ -126,7 +127,6 @@ int main(int argc, char *argv[])
            blueprint->timestamp("verified_at").useCurrent();
            blueprint->timestamps();
            blueprint->softDeletes();
-
            blueprint->foreign({"post_id"}).references("id").on("posts").onDelete("cascade").onUpdate("cascade");
        });
     blueprint.create();
@@ -162,18 +162,21 @@ int main(int argc, char *argv[])
             }
         };
 
-//        QVariantMap record
-//        {
-//            {"name", "Saly Tow"},
-//            {"gender", 1},
-//        };
+        QVariantMap record
+        {
+            {"name", "Saly Tow"},
+            {"gender", 1},
+            {"password", "secret"},
+            {"post_id","123"}
+        };
 
         qint64 ok = -1;
         ok = Database::table().from("users","u").insert(records);
-//        ok = Database::table("users").where("id", 17).update({{"name", "Test update1"}});
-//        ok = Database::table("users").updateOrInsert(record, {{"name", "Saly Two"}});
-//        ok = Database::table("users").where("id", 27).destroy();
-//        ok = Database::table().from("users","u").destroy(2);
+        ok = Database::table().from("users","u").where("id", 5).update({{"name", "Test update1"}});
+        ok = Database::table().from("users","u").updateOrInsert(record, {{"name", "Saly Two"}});
+        ok = Database::table().from("users","u").where("id", 27).destroy();
+        ok = Database::table().from("users").destroy(2);
+        ok = Database::table().from("users","u").destroy(2);
         qDebug() << ok;
     }
 
