@@ -1,9 +1,12 @@
 QT -= gui
 QT += sql
 
-CONFIG += c++17 console
+CONFIG += c++17
 CONFIG -= app_bundle
-
+TEMPLATE = lib
+CONFIG  += dll
+DESTDIR = $$PWD/../../bin/
+DEFINES += QELOQUENT_LIBRARY
 # The following define makes your compiler emit warnings if you use
 # any Qt feature that has been marked deprecated (the exact warnings
 # depend on your compiler). Please consult the documentation of the
@@ -60,6 +63,7 @@ HEADERS += \
     Connection_p.h \
     Database.h \
     MySqlConnection.h \
+    QEloquentMacro.h \
     SQLiteConnection.h \
     connectors/SQLiteConnector.h \
     eloquent/HasRelationship.h \

@@ -1,6 +1,6 @@
 #ifndef DATABASE_H
 #define DATABASE_H
-
+#include "QEloquentMacro.h"
 #include "query/QueryBuilder.h"
 #include "schema/SchemaBuilder.h"
 
@@ -58,7 +58,7 @@ class Connector;
 class ConnectionProvider;
 
 class DatabasePrivate;
-class Database : public QObject
+class QELOQUENT_EXPORT Database : public QObject
 {
     Q_OBJECT
     Q_DECLARE_PRIVATE(Database)

@@ -1,6 +1,6 @@
 #ifndef QUERYBUILDER_H
 #define QUERYBUILDER_H
-
+#include "QEloquentMacro.h"
 #include <QObject>
 #include <QSqlQuery>
 #include <QVariant>
@@ -11,7 +11,7 @@ class Connection;
 class Grammar;
 class Clause;
 class QueryBuilderPrivate;
-class QueryBuilder
+class QELOQUENT_EXPORT QueryBuilder
 {
     Q_DECLARE_PRIVATE(QueryBuilder)
     QScopedPointer<QueryBuilderPrivate> d_ptr;
