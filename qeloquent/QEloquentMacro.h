@@ -1,0 +1,14 @@
+
+#ifndef QELOQUENTMACRO_H
+#define QELOQUENTMACRO_H
+
+#include <QtCore/qglobal.h>
+//#define QELOQUENT_EXPORT Q_DECL_EXPORT
+
+
+#if defined(QELOQUENT_LIBRARY)
+#  define QELOQUENT_EXPORT Q_DECL_EXPORT
+#else
+#  define QELOQUENT_EXPORT Q_DECL_IMPORT
+#endif
+#endif // QELOQUENTMACRO_H

@@ -1,11 +1,11 @@
 #ifndef GRAMMAR_H
 #define GRAMMAR_H
-
+#include "QEloquentMacro.h"
 #include <QObject>
 
 class GrammarPrivate;
 // derive QObject for invoke methods
-class Grammar : public QObject
+class QELOQUENT_EXPORT Grammar : public QObject
 {
     Q_DECLARE_PRIVATE(Grammar)
 public:

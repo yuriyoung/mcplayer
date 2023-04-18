@@ -1,6 +1,6 @@
 #ifndef DATABASE_H
 #define DATABASE_H
-
+#include "QEloquentMacro.h"
 #include "query/QueryBuilder.h"
 #include "schema/SchemaBuilder.h"
 
@@ -58,7 +58,7 @@ class Connector;
 class ConnectionProvider;
 
 class DatabasePrivate;
-class Database : public QObject
+class QELOQUENT_EXPORT Database : public QObject
 {
     Q_OBJECT
     Q_DECLARE_PRIVATE(Database)
@@ -67,7 +67,7 @@ public:
     ~Database();
 
     static Database *instance();
-    static QueryBuilder table(const QString &table, const QString &as = "", const QString &connection = "");
+    static QueryBuilder table(const QString &connection = "");
     static SchemaBuilder schema(const QString &connection = "");
 
     // get a datanase connection by specified config name, not a connection name

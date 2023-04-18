@@ -1,6 +1,6 @@
 #ifndef BLUEPRINT_H
 #define BLUEPRINT_H
-
+#include "QEloquentMacro.h"
 #include "ColumnDefinition.h"
 #include "Command.h"
 
@@ -31,7 +31,7 @@
 class Grammar;
 class Connection ;
 class BlueprintPrivate;
-class Blueprint
+class QELOQUENT_EXPORT Blueprint
 {
     Q_DECLARE_PRIVATE(Blueprint)
     QScopedPointer<BlueprintPrivate> d_ptr;

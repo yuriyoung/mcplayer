@@ -1,6 +1,6 @@
 #ifndef CONNECTION_H
 #define CONNECTION_H
-
+#include "QEloquentMacro.h"
 #include "query/QueryBuilder.h"
 
 #include <QObject>
@@ -21,7 +21,7 @@ class Grammar;
 class SchemaBuilder;
 
 class ConnectionPrivate;
-class Connection
+class QELOQUENT_EXPORT Connection
 {
     Q_DECLARE_PRIVATE(Connection)
 public:

@@ -80,7 +80,7 @@ QString SchemaGrammarPrivate::compileCommand(const Command &command)
     QString methodName = QString("compile") + name.replace(0, 1, name[0].toUpper());
     QByteArray text = methodName.toLocal8Bit();
     const char *method = text.constData();
-
+    qDebug()<<text;
     QString retVal;
     q->metaObject()->invokeMethod(
         q,

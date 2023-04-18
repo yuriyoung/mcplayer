@@ -170,7 +170,7 @@ bool Connection::insert(const QString &query, const QVariantMap &bindings)
     sqlQuery.prepare(query);
     foreach (auto &val, bindings)
         sqlQuery.addBindValue(val);
-
+    qDebug().noquote()<<query;
     bool ok;
     if(!(ok = sqlQuery.exec()))
     {

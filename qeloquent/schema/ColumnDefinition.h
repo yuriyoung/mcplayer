@@ -1,6 +1,6 @@
 #ifndef COLUMNDEFINITION_H
 #define COLUMNDEFINITION_H
-
+#include "QEloquentMacro.h"
 #include <QObject>
 #include <QVariant>
 
@@ -29,7 +29,7 @@
  *
  */
 class ColumnDefinitionPrivate;
-class ColumnDefinition
+class QELOQUENT_EXPORT ColumnDefinition
 {
     friend class Blueprint;
     friend class SchemaGrammar;

@@ -1,6 +1,6 @@
 #ifndef COMMAND_H
 #define COMMAND_H
-
+#include "QEloquentMacro.h"
 #include <QStringList>
 #include <QHash>
 #include <QVariant>
@@ -18,7 +18,7 @@
  */
 class Blueprint;
 class CommandPrivate;
-class Command
+class QELOQUENT_EXPORT Command
 {
 public:
     enum Type

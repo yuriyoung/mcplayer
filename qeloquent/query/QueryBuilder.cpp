@@ -290,7 +290,7 @@ bool QueryBuilder::insert(const QVariantMap &value)
     this->setBindings(InsertBinding, {value});
     QStringList statements = d->grammar->compile(this, InsertStatement);
     QString query = statements.join("; ");
-
+    qDebug()<<query;
     return d->connection->insert(query, value);
 }
 
@@ -347,10 +347,11 @@ int QueryBuilder::destroy(const QVariant &id)
     Q_D(QueryBuilder);
     if(id.isValid())
     {
-        this->where(d->table + ".id", "=", id);
+        this->where("id", "=", id);
     }
 
     QString sql = d->grammar->compile(this, DeleteStatement).join("; ");
+    qDebug().noquote()<<sql;
     QVariantMap binding =  this->bindings(DeleteBinding).isEmpty()
             ? QVariantMap() : this->bindings(DeleteBinding).first();
     return this->connection()->del(sql, binding);
@@ -439,7 +440,6 @@ QueryBuilder &QueryBuilder::from(const QString &table, const QString &as)
     FromClause *fc = new FromClause(table, as);
     d->setClause(Clause::From, fc);
     d->table = fc->table();
-
     return *this;
 }
 

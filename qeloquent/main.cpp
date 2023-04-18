@@ -1,8 +1,8 @@
-//#include "schema/Blueprint.h"
-//#include "schema/SQLiteSchemaGrammar.h"
-//#include "Connection.h"
-//#include "SQLiteConnection.h"
-//#include "ConnectionProvider.h"
+#include "schema/Blueprint.h"
+#include "schema/SQLiteSchemaGrammar.h"
+#include "Connection.h"
+#include "SQLiteConnection.h"
+#include "ConnectionProvider.h"
 #include "Database.h"
 #include "query/QueryBuilder.h"
 #include "query/QueryGrammar.h"
@@ -68,8 +68,8 @@ int main(int argc, char *argv[])
     qDebug() << "Return type: " << metaMethod.returnType();
     qDebug() << "Type name: " << metaMethod.typeName();
 */
-
 /*
+
     SQLiteSchemaGrammar grammar;
     Blueprint blueprint("users", [](Blueprint *blueprint){
         blueprint->increments("id").comment("primary key");
@@ -81,12 +81,14 @@ int main(int argc, char *argv[])
         blueprint->timestamps();
         blueprint->softDeletes();
 
-        blueprint->foreign({"post_id"}).references("id").on("posts").onDelete("cascade").onUpdate("cascade");
+//        blueprint->foreign({"post_id"}).references("id").on("posts").onDelete("cascade").onUpdate("cascade");
     });
 
     blueprint.create();
     blueprint.build(nullptr, &grammar);
 */
+
+
 /*
     {
         DatabaseManager::schema()->dropIfExists("users");
@@ -113,19 +115,34 @@ int main(int argc, char *argv[])
 
 //    QDateTime now = QDateTime::currentDateTime();
 //    qDebug() << now.toString("yyyy-MM-dd HH:mm:ss");
-
+    //Create Table
+    Connection *connection = Database::instance()->connection();
+    QSharedPointer<Grammar> grammar = connection->schemaGrammar();
+    Blueprint blueprint("users", [](Blueprint *blueprint){
+           blueprint->increments("id").comment("primary key");
+           blueprint->string("name");
+           blueprint->string("password");
+           blueprint->string("gender").nullable();
+           blueprint->integer("post_id");
+           blueprint->timestamp("verified_at").useCurrent();
+           blueprint->timestamps();
+           blueprint->softDeletes();
+           blueprint->foreign({"post_id"}).references("id").on("posts").onDelete("cascade").onUpdate("cascade");
+       });
+    blueprint.create();
+    blueprint.build(connection, grammar.data());
 
     {
-        QString sql = Database::table("users").select(/*"name"*/)
-                .from("users")//.distinct()
-                .where("gender", "1")
-                .where("name", "=", "abc")
-                .orWhere("name", "=", "aa")
-                .orderBy("name")
-//                .join("posts", "users.post_id", "=", "posts.id")
-                .join("posts", "post_id", "=", "id")
-                .limit(10)
-                .toSql();
+//        QString sql = Database::table("users").select(/*"name"*/)
+//                .from("users")//.distinct()
+//                .where("gender", "1")
+//                .where("name", "=", "abc")
+//                .orWhere("name", "=", "aa")
+//                .orderBy("name")
+////                .join("posts", "users.post_id", "=", "posts.id")
+//                .join("posts", "post_id", "=", "id")
+//                .limit(10)
+//                .toSql();
 
         QList<QVariantMap> records
         {
@@ -134,12 +151,14 @@ int main(int argc, char *argv[])
                 {"name", "Mey"},
                 {"gender", 2},
                 {"password", "secret"},
+                {"post_id","123"}
             },
             QVariantMap
             {
                 {"name", "Yui"},
                 {"gender", 2},
                 {"password", "secret"},
+                {"post_id","123"}
             }
         };
 
@@ -147,14 +166,17 @@ int main(int argc, char *argv[])
         {
             {"name", "Saly Tow"},
             {"gender", 1},
+            {"password", "secret"},
+            {"post_id","123"}
         };
 
         qint64 ok = -1;
-//        ok = Database::table("users").insert(records);
-//        ok = Database::table("users").where("id", 17).update({{"name", "Test update1"}});
-//        ok = Database::table("users").updateOrInsert(record, {{"name", "Saly Two"}});
-//        ok = Database::table("users").where("id", 27).destroy();
-//        ok = Database::table("users").destroy(33);
+        ok = Database::table().from("users","u").insert(records);
+        ok = Database::table().from("users","u").where("id", 5).update({{"name", "Test update1"}});
+        ok = Database::table().from("users","u").updateOrInsert(record, {{"name", "Saly Two"}});
+        ok = Database::table().from("users","u").where("id", 27).destroy();
+        ok = Database::table().from("users").destroy(2);
+        ok = Database::table().from("users","u").destroy(2);
         qDebug() << ok;
     }
 
@@ -165,8 +187,8 @@ int main(int argc, char *argv[])
 //    map.insert(0, QSharedPointer<A>(new A(4)));
 //    map.remove(2);
 
-    User user;
-    user.dump();
+//    User user;
+//    user.dump();
 
     return app.exec();
 }

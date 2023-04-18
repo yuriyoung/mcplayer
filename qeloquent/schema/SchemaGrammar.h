@@ -129,37 +129,37 @@ protected slots:
     virtual QString typeMultiPolygon(const ColumnDefinition &column) const;
 
 protected:
-    virtual QString compileTableExists(const Command &command) = 0;
-    virtual QString compileColumnListing(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileTableExists(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileColumnListing(const Command &command) = 0;
 
-    virtual QString compileEnableForeignKeyConstraints(const Command &command) = 0;
-    virtual QString compileDisableForeignKeyConstraints(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileEnableForeignKeyConstraints(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileDisableForeignKeyConstraints(const Command &command) = 0;
 
-    virtual QString compileCreate(const Command &command) = 0;
-    virtual QString compileAdd(const Command &command) = 0;
-    virtual QString compileChange(const Command &command) = 0;
-    virtual QString compileForeign(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileCreate(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileAdd(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileChange(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileForeign(const Command &command) = 0;
 
-    virtual QString compileRename(const Command &command) = 0;
-    virtual QString compileRenameColumn(const Command &command);
-    virtual QString compileRenameIndex(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileRename(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileRenameColumn(const Command &command);
+    Q_INVOKABLE virtual QString compileRenameIndex(const Command &command) = 0;
 
-    virtual QString compilePrimary(const Command &command) = 0;
-    virtual QString compileUnique(const Command &command) = 0;
-    virtual QString compileIndex(const Command &command) = 0;
-    virtual QString compileSpatialIndex(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compilePrimary(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileUnique(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileIndex(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileSpatialIndex(const Command &command) = 0;
 
-    virtual QString compileDrop(const Command &command) = 0;
-    virtual QString compileDropIfExists(const Command &command) = 0;
-    virtual QString compileDropColumn(const Command &command) = 0;
-    virtual QString compileDropPrimary(const Command &command);
-    virtual QString compileDropUnique(const Command &command) = 0;
-    virtual QString compileDropIndex(const Command &command) = 0;
-    virtual QString compileDropSpatialIndex(const Command &command) = 0;
-    virtual QString compileDropForeign(const Command &command);
-    virtual QString compileDropAllTables(const Command &command) = 0;
-    virtual QString compileDropAllViews(...);
-    virtual QString compileRebuild();
+    Q_INVOKABLE virtual QString compileDrop(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileDropIfExists(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileDropColumn(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileDropPrimary(const Command &command);
+    Q_INVOKABLE virtual QString compileDropUnique(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileDropIndex(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileDropSpatialIndex(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileDropForeign(const Command &command);
+    Q_INVOKABLE virtual QString compileDropAllTables(const Command &command) = 0;
+    Q_INVOKABLE virtual QString compileDropAllViews(...);
+    Q_INVOKABLE virtual QString compileRebuild();
 
     /**
      * @brief to implement apply column modifier for any engines:

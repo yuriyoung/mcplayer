@@ -70,9 +70,9 @@ Database *Database::instance()
     return g_instance;
 }
 
-QueryBuilder Database::table(const QString &table, const QString &as, const QString &connection)
+QueryBuilder Database::table(const QString &connection)
 {
-    return Database::instance()->connection(connection)->queryBuilder().from(table, as);
+    return Database::instance()->connection(connection)->queryBuilder();
 }
 
 SchemaBuilder Database::schema(const QString &connection)
